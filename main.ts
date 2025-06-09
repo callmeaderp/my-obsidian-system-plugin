@@ -90,7 +90,14 @@ export default class MOCSystemPlugin extends Plugin {
 		for (const folder of Object.values(FOLDERS)) {
 			const folderPath = normalizePath(folder);
 			if (!this.app.vault.getAbstractFileByPath(folderPath)) {
-				await this.app.vault.createFolder(folderPath);
+				try {
+					await this.app.vault.createFolder(folderPath);
+				} catch (error) {
+					// Folder might have been created by another process, ignore if it already exists
+					if (!error.message?.includes('Folder already exists')) {
+						throw error;
+					}
+				}
 			}
 		}
 	}
