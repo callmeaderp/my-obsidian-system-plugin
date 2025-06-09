@@ -18,6 +18,14 @@ const FOLDERS = {
 const SECTION_ORDER = ['MOCs', 'Notes', 'Resources', 'Prompts'] as const;
 type SectionType = typeof SECTION_ORDER[number];
 
+// Note type configurations with emojis and classes
+const NOTE_TYPES = {
+	MOCs: { emoji: '🔵', class: 'moc' },
+	Notes: { emoji: '📝', class: 'note' },
+	Resources: { emoji: '📁', class: 'resource' },
+	Prompts: { emoji: '🤖', class: 'prompt' }
+} as const;
+
 export default class MOCSystemPlugin extends Plugin {
 	settings: PluginSettings;
 
@@ -72,6 +80,30 @@ export default class MOCSystemPlugin extends Plugin {
 				}
 			})
 		);
+
+		// Add styling classes based on active file
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', () => {
+				this.updateStylingClasses();
+			})
+		);
+
+		// Add initial styling classes
+		this.updateStylingClasses();
+
+		// Add file explorer styling on layout change
+		this.registerEvent(
+			this.app.workspace.on('layout-change', () => {
+				this.updateFileExplorerStyling();
+			})
+		);
+
+		// Update tab classes when tabs change
+		this.registerEvent(
+			this.app.workspace.on('file-open', () => {
+				setTimeout(() => this.updateTabStyling(), 100);
+			})
+		);
 	}
 
 	onunload() {
@@ -117,8 +149,8 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	async createMOC(name: string): Promise<TFile> {
-		const fileName = `${name}.md`;
-		const content = `---\ntags:\n  - moc\n---\n`;
+		const fileName = `${NOTE_TYPES.MOCs.emoji} ${name} MOC.md`;
+		const content = `---\ntags:\n  - moc\nnote-type: moc\n---\n`;
 		
 		const file = await this.app.vault.create(fileName, content);
 		await this.app.workspace.getLeaf().openFile(file);
@@ -127,8 +159,8 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	async createSubMOC(parentMOC: TFile, name: string): Promise<TFile> {
-		const fileName = `${FOLDERS.MOCs}/${name}.md`;
-		const content = `---\ntags:\n  - moc\n---\n`;
+		const fileName = `${FOLDERS.MOCs}/${NOTE_TYPES.MOCs.emoji} ${name} MOC.md`;
+		const content = `---\ntags:\n  - moc\nnote-type: moc\n---\n`;
 		
 		const file = await this.app.vault.create(normalizePath(fileName), content);
 		await this.addToMOCSection(parentMOC, 'MOCs', file);
@@ -137,8 +169,8 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	async createNote(parentMOC: TFile, name: string): Promise<TFile> {
-		const fileName = `${FOLDERS.Notes}/${name}.md`;
-		const content = '';
+		const fileName = `${FOLDERS.Notes}/${NOTE_TYPES.Notes.emoji} ${name}.md`;
+		const content = `---\nnote-type: note\n---\n`;
 		
 		const file = await this.app.vault.create(normalizePath(fileName), content);
 		await this.addToMOCSection(parentMOC, 'Notes', file);
@@ -147,8 +179,8 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	async createResource(parentMOC: TFile, name: string): Promise<TFile> {
-		const fileName = `${FOLDERS.Resources}/${name}.md`;
-		const content = '';
+		const fileName = `${FOLDERS.Resources}/${NOTE_TYPES.Resources.emoji} ${name}.md`;
+		const content = `---\nnote-type: resource\n---\n`;
 		
 		const file = await this.app.vault.create(normalizePath(fileName), content);
 		await this.addToMOCSection(parentMOC, 'Resources', file);
@@ -158,14 +190,14 @@ export default class MOCSystemPlugin extends Plugin {
 
 	async createPrompt(parentMOC: TFile, name: string): Promise<TFile> {
 		// Create prompt hub
-		const hubFileName = `${FOLDERS.Prompts}/${name}.md`;
-		const hubContent = `# ${name}\n\n## Iterations\n\n- [[${name} v1]]\n\n## LLM Links\n\n\`\`\`llm-links\n\n\`\`\`\n`;
+		const hubFileName = `${FOLDERS.Prompts}/${NOTE_TYPES.Prompts.emoji} ${name}.md`;
+		const hubContent = `---\nnote-type: prompt\n---\n\n# ${name}\n\n## Iterations\n\n- [[${NOTE_TYPES.Prompts.emoji} ${name} v1]]\n\n## LLM Links\n\n\`\`\`llm-links\n\n\`\`\`\n`;
 		
 		const hubFile = await this.app.vault.create(normalizePath(hubFileName), hubContent);
 		
 		// Create first iteration
-		const iterationFileName = `${FOLDERS.Prompts}/${name} v1.md`;
-		const iterationContent = '';
+		const iterationFileName = `${FOLDERS.Prompts}/${NOTE_TYPES.Prompts.emoji} ${name} v1.md`;
+		const iterationContent = `---\nnote-type: prompt\n---\n`;
 		await this.app.vault.create(normalizePath(iterationFileName), iterationContent);
 		
 		await this.addToMOCSection(parentMOC, 'Prompts', hubFile);
@@ -237,14 +269,17 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	async duplicatePromptIteration(file: TFile) {
-		const match = file.basename.match(/^(.+?)\s*v(\d+)(?:\s*-\s*(.+))?$/);
+		// Handle both old format (without emoji) and new format (with emoji)
+		const match = file.basename.match(/^(?:🤖\s+)?(.+?)\s*v(\d+)(?:\s*-\s*(.+))?$/);
 		if (!match) return;
 		
 		const [, baseName, currentVersion] = match;
 		
 		// Find all iterations to get next available version
 		const promptFiles = this.app.vault.getMarkdownFiles()
-			.filter(f => f.path.startsWith(FOLDERS.Prompts) && f.basename.startsWith(baseName));
+			.filter(f => f.path.startsWith(FOLDERS.Prompts) && (
+				f.basename.includes(baseName) && f.basename.includes('v')
+			));
 		
 		let maxVersion = 0;
 		for (const pFile of promptFiles) {
@@ -259,11 +294,15 @@ export default class MOCSystemPlugin extends Plugin {
 		// Ask for description
 		new PromptDescriptionModal(this.app, async (description: string) => {
 			const newName = description 
-				? `${baseName} v${nextVersion} - ${description}`
-				: `${baseName} v${nextVersion}`;
+				? `${NOTE_TYPES.Prompts.emoji} ${baseName} v${nextVersion} - ${description}`
+				: `${NOTE_TYPES.Prompts.emoji} ${baseName} v${nextVersion}`;
 			
 			const newPath = `${FOLDERS.Prompts}/${newName}.md`;
-			const content = await this.app.vault.read(file);
+			const originalContent = await this.app.vault.read(file);
+			// Add frontmatter if it doesn't exist
+			const content = originalContent.startsWith('---') 
+				? originalContent 
+				: `---\nnote-type: prompt\n---\n\n${originalContent}`;
 			
 			const newFile = await this.app.vault.create(normalizePath(newPath), content);
 			
@@ -276,7 +315,7 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	async updatePromptHub(baseName: string, newIteration: TFile) {
-		const hubPath = `${FOLDERS.Prompts}/${baseName}.md`;
+		const hubPath = `${FOLDERS.Prompts}/${NOTE_TYPES.Prompts.emoji} ${baseName}.md`;
 		const hubFile = this.app.vault.getAbstractFileByPath(normalizePath(hubPath));
 		
 		if (hubFile instanceof TFile) {
@@ -363,6 +402,89 @@ export default class MOCSystemPlugin extends Plugin {
 
 	isPromptHub(file: TFile): boolean {
 		return file.path.startsWith(FOLDERS.Prompts) && !this.isPromptIteration(file);
+	}
+
+	getNoteType(file: TFile): string | null {
+		const cache = this.app.metadataCache.getFileCache(file);
+		return cache?.frontmatter?.['note-type'] ?? null;
+	}
+
+	getFileDisplayType(file: TFile): string {
+		const noteType = this.getNoteType(file);
+		if (noteType) {
+			if (noteType === 'prompt') {
+				// Differentiate between prompt hubs and iterations
+				return this.isPromptIteration(file) ? 'prompt-iteration' : 'prompt-hub';
+			}
+			return noteType;
+		}
+		
+		// Fallback for MOCs without proper metadata
+		if (this.isMOC(file)) {
+			return 'moc';
+		}
+		
+		return 'unknown';
+	}
+
+	updateStylingClasses() {
+		const activeFile = this.app.workspace.getActiveFile();
+		
+		// Remove all existing note type classes
+		document.body.classList.remove('smart-note-group', 'smart-note-note', 'smart-note-prompt', 'smart-note-resource', 'smart-note-prompt-hub', 'smart-note-prompt-iteration');
+		
+		if (activeFile) {
+			const displayType = this.getFileDisplayType(activeFile);
+			if (displayType === 'moc') {
+				document.body.classList.add('smart-note-group');
+			} else if (displayType !== 'unknown') {
+				document.body.classList.add(`smart-note-${displayType}`);
+			}
+		}
+	}
+
+	updateFileExplorerStyling() {
+		// Add data attributes to file explorer items for CSS targeting
+		const fileItems = document.querySelectorAll('.nav-file-title');
+		fileItems.forEach((item: HTMLElement) => {
+			const path = item.getAttribute('data-path');
+			if (path) {
+				const file = this.app.vault.getAbstractFileByPath(path);
+				if (file instanceof TFile) {
+					const displayType = this.getFileDisplayType(file);
+					if (displayType === 'moc') {
+						item.setAttribute('data-smart-note-type', 'group');
+					} else if (displayType !== 'unknown') {
+						item.setAttribute('data-smart-note-type', displayType);
+					}
+				}
+			}
+		});
+	}
+
+	updateTabStyling() {
+		// Add classes to tab headers for CSS targeting
+		const tabHeaders = document.querySelectorAll('.workspace-tab-header');
+		tabHeaders.forEach((tab: HTMLElement) => {
+			// Remove existing classes
+			tab.classList.remove('smart-note-tab-group', 'smart-note-tab-note', 'smart-note-tab-prompt', 'smart-note-tab-resource', 'smart-note-tab-prompt-hub', 'smart-note-tab-prompt-iteration');
+			tab.removeAttribute('data-smart-note-type');
+			
+			const ariaLabel = tab.getAttribute('aria-label');
+			if (ariaLabel) {
+				const file = this.app.vault.getAbstractFileByPath(ariaLabel);
+				if (file instanceof TFile) {
+					const displayType = this.getFileDisplayType(file);
+					if (displayType === 'moc') {
+						tab.classList.add('smart-note-tab-group');
+						tab.setAttribute('data-smart-note-type', 'group');
+					} else if (displayType !== 'unknown') {
+						tab.classList.add(`smart-note-tab-${displayType}`);
+						tab.setAttribute('data-smart-note-type', displayType);
+					}
+				}
+			}
+		});
 	}
 }
 

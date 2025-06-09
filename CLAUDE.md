@@ -17,11 +17,13 @@ The primary goal of this plugin is to automate the user's MOC-based system for o
 
 ### File Organization Structure
 
-- **Top-level MOCs**: Created in vault root directory
-- **Sub-MOCs**: Stored in `MOCs/` folder
-- **Notes**: Stored in `Notes/` folder  
-- **Resources**: Stored in `Resources/` folder
-- **Prompts**: Stored in `Prompts/` folder (includes both hubs and iterations)
+- **Top-level MOCs**: Created in vault root directory with 🔵 emoji prefix and "MOC" suffix
+- **Sub-MOCs**: Stored in `MOCs/` folder with 🔵 emoji prefix and "MOC" suffix
+- **Notes**: Stored in `Notes/` folder with 📝 emoji prefix  
+- **Resources**: Stored in `Resources/` folder with 📁 emoji prefix
+- **Prompts**: Stored in `Prompts/` folder with 🤖 emoji prefix (includes both hubs and iterations)
+
+All files include frontmatter with `note-type` metadata for CSS targeting and backwards compatibility.
 
 ### MOC Structure
 
@@ -71,11 +73,35 @@ The prompt system is designed for iterative LLM conversations:
 - Parses `llm-links` code block
 - Opens all URLs in new browser tabs
 
-### 4. Automatic Features
+### 4. Note Type Styling System
+**New Feature**: Visual distinction for note types
+
+- **Emoji Prefixes**: All created notes include type-specific emojis:
+  - MOCs: 🔵 (Blue circle)
+  - Notes: 📝 (Memo emoji)
+  - Resources: 📁 (Folder emoji)  
+  - Prompts: 🤖 (Robot emoji)
+
+- **CSS Color Coding**: Unique colors for each note type:
+  - MOCs/Groups: Blue (#2563eb) with bold styling
+  - Notes: Green (#16a34a)
+  - Resources: Orange (#ea580c)
+  - Prompt Hubs: Dark Purple (#9333ea) with bold styling
+  - Prompt Iterations: Light Purple (#c084fc) with italic styling
+
+- **Comprehensive Styling**: Applies to:
+  - File explorer entries
+  - Tab titles (all tabs, not just active)
+  - Active file indicators
+  - Graph view nodes with size differentiation
+  - Both light and dark themes
+
+### 5. Automatic Features
 
 - **Folder Structure**: Creates required folders on plugin load
-- **Section Management**: Adds sections to MOCs only when first item is created
+- **Section Management**: Non-destructively adds sections to MOCs at the top, preserving existing content
 - **Link Cleanup**: Removes broken links when files are deleted
+- **Dynamic Styling**: Updates CSS classes based on active file and file types
 
 ## Implementation Details
 
@@ -92,17 +118,18 @@ export default class MOCSystemPlugin extends Plugin {
 ### Key Methods
 
 #### Content Creation Methods
-- `createMOC()`: Creates top-level MOC with frontmatter tags
-- `createSubMOC()`: Creates MOC in MOCs/ folder and links from parent
-- `createNote()`: Creates note in Notes/ folder and links from parent MOC
-- `createResource()`: Creates resource in Resources/ folder and links from parent
-- `createPrompt()`: Creates prompt hub with first iteration and LLM links block
+- `createMOC()`: Creates top-level MOC with emoji prefix, "MOC" suffix, frontmatter tags, and note-type metadata
+- `createSubMOC()`: Creates MOC in MOCs/ folder with emoji prefix, "MOC" suffix, and links from parent
+- `createNote()`: Creates note in Notes/ folder with emoji prefix and links from parent MOC
+- `createResource()`: Creates resource in Resources/ folder with emoji prefix and links from parent
+- `createPrompt()`: Creates prompt hub and iteration with emoji prefixes, metadata, and LLM links block
 
 #### Section Management
-- `addToMOCSection()`: Intelligently adds links to MOC sections
-  - Creates section if it doesn't exist
+- `addToMOCSection()`: Non-destructively adds links to MOC sections
+  - Creates section if it doesn't exist at the top (after frontmatter)
   - Maintains proper section ordering
-  - Inserts links at appropriate position
+  - Preserves any existing content below the managed sections
+  - Inserts links at appropriate position within sections
 
 #### Prompt System
 - `duplicatePromptIteration()`: 
@@ -112,6 +139,13 @@ export default class MOCSystemPlugin extends Plugin {
   - Updates prompt hub with new iteration link
 - `updatePromptHub()`: Adds new iteration links to hub file
 - `openLLMLinks()`: Extracts URLs from code block and opens in browser
+
+#### Styling System
+- `getNoteType()`: Determines note type from frontmatter metadata
+- `getFileDisplayType()`: Differentiates between prompt hubs and iterations for styling
+- `updateStylingClasses()`: Updates body classes based on active file for CSS targeting
+- `updateFileExplorerStyling()`: Adds data attributes to file explorer items
+- `updateTabStyling()`: Adds classes and data attributes to tab headers
 
 #### Maintenance
 - `cleanupBrokenLinks()`: Removes references to deleted files
@@ -147,15 +181,20 @@ The plugin includes several custom modals for user input:
 
 ## Current Status
 
-The plugin has been fully implemented with all requested features:
+The plugin has been fully implemented with all requested features plus recent improvements:
 - ✅ Context-aware creation command
 - ✅ Prompt iteration system with versioning
 - ✅ Multi-link opening for LLM chats
 - ✅ Dynamic section management
 - ✅ Automatic link cleanup
 - ✅ Folder structure creation
+- ✅ **NEW**: Emoji-prefixed note titles with type indicators and "MOC" suffix for MOCs
+- ✅ **NEW**: Comprehensive CSS styling system with distinct colors for all note types
+- ✅ **NEW**: Non-destructive MOC behavior (preserves existing content as "scratch pad")
+- ✅ **NEW**: Tab title styling for all tabs (not just active files)
+- ✅ **NEW**: Differentiated styling for prompt hubs vs iterations
 
-The plugin has been built and is ready for testing in Obsidian.
+The plugin has been built and tested successfully with all styling issues resolved.
 
 ## History
 
