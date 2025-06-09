@@ -102,13 +102,14 @@ The prompt system is designed for iterative LLM conversations:
 - Safely removes all files created by the plugin
 - Identifies plugin files via `note-type` frontmatter metadata
 - Shows confirmation modal with file list and count
-- Cleans up empty plugin folders after file deletion
+- Preserves plugin folders (MOCs/, Notes/, Resources/, Prompts/) for reuse
 - Preserves all pre-existing files without plugin metadata
 
 ### 6. Automatic Features
 
 - **Folder Structure**: Creates required folders on plugin load
-- **Section Management**: Non-destructively adds sections to MOCs at the top, preserving existing content
+- **Section Management**: Intelligently reorganizes MOC content to keep plugin sections at the top
+- **Content Preservation**: Moves user content above plugin sections to below them while preserving all content
 - **Link Cleanup**: Removes broken links when files are deleted
 - **Dynamic Styling**: Updates CSS classes based on active file and file types
 
@@ -134,11 +135,14 @@ export default class MOCSystemPlugin extends Plugin {
 - `createPrompt()`: Creates prompt hub and iteration with emoji prefixes, metadata, and LLM links block
 
 #### Section Management
-- `addToMOCSection()`: Non-destructively adds links to MOC sections
-  - Creates section if it doesn't exist at the top (after frontmatter)
-  - Maintains proper section ordering
-  - Preserves any existing content below the managed sections
-  - Inserts links at appropriate position within sections
+- `addToMOCSection()`: Intelligently manages MOC sections with content reorganization
+  - Reorganizes content to place all plugin sections at the top (after frontmatter)
+  - Moves any user content above plugin sections to below them
+  - Maintains proper section ordering (MOCs → Notes → Resources → Prompts)
+  - Preserves all user content within and below plugin sections
+  - Creates sections if they don't exist in proper order
+- `reorganizeContentForPluginSections()`: Handles content extraction and reordering
+- `findSectionEnd()`: Utility to detect section boundaries
 
 #### Prompt System
 - `duplicatePromptIteration()`: 
@@ -206,6 +210,8 @@ The plugin has been fully implemented with all requested features plus recent im
 - ✅ **NEW**: Tab title styling for all tabs (not just active files)
 - ✅ **NEW**: Differentiated styling for prompt hubs vs iterations
 - ✅ **NEW**: System cleanup command for safe removal of all plugin-created files
+- ✅ **NEW**: Robust content reorganization that moves plugin sections to top while preserving user content
+- ✅ **NEW**: Enhanced folder preservation during cleanup (folders are kept, only files removed)
 
 The plugin has been built and tested successfully with all features implemented and working.
 

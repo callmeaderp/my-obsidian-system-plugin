@@ -216,63 +216,183 @@ export default class MOCSystemPlugin extends Plugin {
 		const content = await this.app.vault.read(moc);
 		const lines = content.split('\n');
 		
-		// Find or create section
-		let sectionIndex = -1;
-		let insertIndex = lines.length;
+		// Find frontmatter bounds
+		let frontmatterEnd = 0;
+		if (lines[0] === '---') {
+			for (let i = 1; i < lines.length; i++) {
+				if (lines[i] === '---') {
+					frontmatterEnd = i + 1;
+					break;
+				}
+			}
+		}
 		
-		for (let i = 0; i < lines.length; i++) {
-			if (lines[i].trim() === `## ${section}`) {
-				sectionIndex = i;
+		// Find existing plugin sections and reorganize content if needed
+		const { reorganizedLines, sectionIndices } = this.reorganizeContentForPluginSections(lines, frontmatterEnd);
+		
+		// Find or create section in reorganized content
+		let sectionIndex = -1;
+		for (const [sectionName, index] of sectionIndices) {
+			if (sectionName === section) {
+				sectionIndex = index;
 				break;
 			}
 		}
 		
 		if (sectionIndex === -1) {
-			// Section doesn't exist, find where to insert it
-			const currentSectionIndices: Map<SectionType, number> = new Map();
+			// Section doesn't exist, find where to insert it according to SECTION_ORDER
+			let insertIndex = frontmatterEnd;
 			
-			// Find existing sections
-			for (let i = 0; i < lines.length; i++) {
-				for (const sectionName of SECTION_ORDER) {
-					if (lines[i].trim() === `## ${sectionName}`) {
-						currentSectionIndices.set(sectionName, i);
-					}
-				}
-			}
-			
-			// Find where to insert new section
-			insertIndex = lines.length;
-			for (let i = SECTION_ORDER.indexOf(section) + 1; i < SECTION_ORDER.length; i++) {
-				if (currentSectionIndices.has(SECTION_ORDER[i])) {
-					insertIndex = currentSectionIndices.get(SECTION_ORDER[i])!;
+			// Find correct position based on section order
+			const currentSectionIndex = SECTION_ORDER.indexOf(section);
+			for (let i = currentSectionIndex + 1; i < SECTION_ORDER.length; i++) {
+				if (sectionIndices.has(SECTION_ORDER[i])) {
+					insertIndex = sectionIndices.get(SECTION_ORDER[i])!;
 					break;
 				}
 			}
 			
-			// Insert section header
+			// If no later sections found, insert after last plugin section
+			if (insertIndex === frontmatterEnd && sectionIndices.size > 0) {
+				const lastSectionIndex = Math.max(...Array.from(sectionIndices.values()));
+				// Find the end of the last section
+				insertIndex = this.findSectionEnd(reorganizedLines, lastSectionIndex);
+			}
+			
+			// Insert section header with proper spacing
 			const newSection = [`## ${section}`, '', `- [[${newFile.basename}]]`, ''];
-			lines.splice(insertIndex, 0, ...newSection);
+			reorganizedLines.splice(insertIndex, 0, ...newSection);
 		} else {
 			// Section exists, add link to it
 			let linkInsertIndex = sectionIndex + 1;
 			
 			// Skip empty lines after header
-			while (linkInsertIndex < lines.length && lines[linkInsertIndex].trim() === '') {
+			while (linkInsertIndex < reorganizedLines.length && reorganizedLines[linkInsertIndex].trim() === '') {
 				linkInsertIndex++;
 			}
 			
-			// Find end of section
-			while (linkInsertIndex < lines.length && 
-				   !lines[linkInsertIndex].startsWith('## ') && 
-				   lines[linkInsertIndex].trim() !== '') {
-				linkInsertIndex++;
+			// Find end of plugin-managed links (stop at user content or next section)
+			while (linkInsertIndex < reorganizedLines.length) {
+				const line = reorganizedLines[linkInsertIndex].trim();
+				
+				// Stop at next section
+				if (line.startsWith('## ')) {
+					break;
+				}
+				
+				// Stop at user content (non-link, non-empty lines)
+				if (line !== '' && !line.match(/^-\s*\[\[.+\]\]$/)) {
+					break;
+				}
+				
+				// Continue if it's a plugin link or empty line
+				if (line === '' || line.match(/^-\s*\[\[.+\]\]$/)) {
+					linkInsertIndex++;
+				} else {
+					break;
+				}
 			}
 			
-			// Insert before empty line or next section
-			lines.splice(linkInsertIndex, 0, `- [[${newFile.basename}]]`);
+			// Insert the new link
+			reorganizedLines.splice(linkInsertIndex, 0, `- [[${newFile.basename}]]`);
 		}
 		
-		await this.app.vault.modify(moc, lines.join('\n'));
+		await this.app.vault.modify(moc, reorganizedLines.join('\n'));
+	}
+
+	private reorganizeContentForPluginSections(lines: string[], frontmatterEnd: number): { reorganizedLines: string[], sectionIndices: Map<SectionType, number> } {
+		const sectionIndices: Map<SectionType, number> = new Map();
+		const pluginSections: Array<{name: SectionType, startIndex: number, endIndex: number}> = [];
+		
+		// Find all existing plugin sections
+		for (let i = frontmatterEnd; i < lines.length; i++) {
+			for (const sectionName of SECTION_ORDER) {
+				if (lines[i].trim() === `## ${sectionName}`) {
+					const startIndex = i;
+					const endIndex = this.findSectionEnd(lines, i);
+					pluginSections.push({ name: sectionName, startIndex, endIndex });
+					break;
+				}
+			}
+		}
+		
+		if (pluginSections.length === 0) {
+			// No plugin sections exist, return as-is
+			return { reorganizedLines: [...lines], sectionIndices };
+		}
+		
+		// Extract plugin sections and other content
+		const extractedSections: string[][] = [];
+		const otherContent: string[] = [];
+		let lastProcessedIndex = frontmatterEnd;
+		
+		// Sort sections by their start index
+		pluginSections.sort((a, b) => a.startIndex - b.startIndex);
+		
+		for (const section of pluginSections) {
+			// Add content before this section to other content
+			if (section.startIndex > lastProcessedIndex) {
+				otherContent.push(...lines.slice(lastProcessedIndex, section.startIndex));
+			}
+			
+			// Extract the section
+			extractedSections.push(lines.slice(section.startIndex, section.endIndex));
+			lastProcessedIndex = section.endIndex;
+		}
+		
+		// Add any remaining content after the last section
+		if (lastProcessedIndex < lines.length) {
+			otherContent.push(...lines.slice(lastProcessedIndex));
+		}
+		
+		// Rebuild the file: frontmatter + plugin sections (in order) + other content
+		const reorganizedLines: string[] = [];
+		
+		// Add frontmatter
+		reorganizedLines.push(...lines.slice(0, frontmatterEnd));
+		
+		// Add plugin sections in proper order
+		for (const sectionName of SECTION_ORDER) {
+			const sectionData = pluginSections.find(s => s.name === sectionName);
+			if (sectionData) {
+				const correspondingExtraction = extractedSections[pluginSections.indexOf(sectionData)];
+				sectionIndices.set(sectionName, reorganizedLines.length);
+				reorganizedLines.push(...correspondingExtraction);
+			}
+		}
+		
+		// Add other content at the end
+		if (otherContent.length > 0) {
+			// Ensure there's a blank line before other content if plugin sections exist
+			if (reorganizedLines.length > frontmatterEnd && otherContent[0]?.trim() !== '') {
+				reorganizedLines.push('');
+			}
+			reorganizedLines.push(...otherContent);
+		}
+		
+		return { reorganizedLines, sectionIndices };
+	}
+
+	private findSectionEnd(lines: string[], sectionStartIndex: number): number {
+		for (let i = sectionStartIndex + 1; i < lines.length; i++) {
+			if (lines[i].trim().startsWith('## ')) {
+				return i;
+			}
+		}
+		return lines.length;
+	}
+
+	private findPluginSectionInsertPoint(lines: string[], frontmatterEnd: number): number {
+		// Look for the first section-like header or end of initial content
+		for (let i = frontmatterEnd; i < lines.length; i++) {
+			// If we find any section header, insert before it
+			if (lines[i].trim().startsWith('## ')) {
+				return i;
+			}
+		}
+		
+		// No sections found, insert at end
+		return lines.length;
 	}
 
 	async duplicatePromptIteration(file: TFile) {
@@ -432,8 +552,7 @@ export default class MOCSystemPlugin extends Plugin {
 				}
 			}
 
-			// Clean up empty plugin folders
-			await this.cleanupEmptyPluginFolders();
+			// Note: We deliberately preserve plugin folders even if empty
 
 			new Notice(`Cleanup complete! Deleted ${deletedCount} files.`);
 		}).open();
