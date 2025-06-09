@@ -96,7 +96,16 @@ The prompt system is designed for iterative LLM conversations:
   - Graph view nodes with size differentiation
   - Both light and dark themes
 
-### 5. Automatic Features
+### 5. System Cleanup Command
+**Command**: "Cleanup MOC system files"
+
+- Safely removes all files created by the plugin
+- Identifies plugin files via `note-type` frontmatter metadata
+- Shows confirmation modal with file list and count
+- Cleans up empty plugin folders after file deletion
+- Preserves all pre-existing files without plugin metadata
+
+### 6. Automatic Features
 
 - **Folder Structure**: Creates required folders on plugin load
 - **Section Management**: Non-destructively adds sections to MOCs at the top, preserving existing content
@@ -150,6 +159,8 @@ export default class MOCSystemPlugin extends Plugin {
 #### Maintenance
 - `cleanupBrokenLinks()`: Removes references to deleted files
 - `ensureFolderStructure()`: Creates required folders if missing
+- `cleanupMOCSystem()`: Removes all plugin-created files based on note-type metadata
+- `cleanupEmptyPluginFolders()`: Removes empty plugin folders after cleanup
 
 ### File Detection Methods
 - `isMOC()`: Checks for `#moc` tag in frontmatter
@@ -164,6 +175,7 @@ The plugin includes several custom modals for user input:
 2. **AddToMOCModal**: Shows options when adding content to existing MOC
 3. **CreateItemModal**: Generic input for creating notes/resources/etc.
 4. **PromptDescriptionModal**: Optional description when duplicating prompts
+5. **CleanupConfirmationModal**: Confirmation dialog for system cleanup with file list
 
 ### Event Handling
 
@@ -193,8 +205,9 @@ The plugin has been fully implemented with all requested features plus recent im
 - ✅ **NEW**: Non-destructive MOC behavior (preserves existing content as "scratch pad")
 - ✅ **NEW**: Tab title styling for all tabs (not just active files)
 - ✅ **NEW**: Differentiated styling for prompt hubs vs iterations
+- ✅ **NEW**: System cleanup command for safe removal of all plugin-created files
 
-The plugin has been built and tested successfully with all styling issues resolved.
+The plugin has been built and tested successfully with all features implemented and working.
 
 ## History
 

@@ -72,6 +72,13 @@ export default class MOCSystemPlugin extends Plugin {
 			}
 		});
 
+		// Command to cleanup all plugin-created files
+		this.addCommand({
+			id: 'cleanup-moc-system',
+			name: 'Cleanup MOC system files',
+			callback: () => this.cleanupMOCSystem()
+		});
+
 		// Auto-cleanup on file deletion
 		this.registerEvent(
 			this.app.vault.on('delete', (file) => {
@@ -391,6 +398,64 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 	}
 
+	async cleanupMOCSystem() {
+		// Find all files created by the plugin
+		const allFiles = this.app.vault.getMarkdownFiles();
+		const pluginFiles: TFile[] = [];
+
+		for (const file of allFiles) {
+			const cache = this.app.metadataCache.getFileCache(file);
+			const noteType = cache?.frontmatter?.['note-type'];
+			
+			// Check if file has note-type metadata (indicates plugin creation)
+			if (noteType && ['moc', 'note', 'resource', 'prompt'].includes(noteType)) {
+				pluginFiles.push(file);
+			}
+		}
+
+		if (pluginFiles.length === 0) {
+			new Notice('No MOC system files found to cleanup');
+			return;
+		}
+
+		// Show confirmation modal
+		new CleanupConfirmationModal(this.app, pluginFiles, async () => {
+			let deletedCount = 0;
+
+			// Delete all plugin files
+			for (const file of pluginFiles) {
+				try {
+					await this.app.vault.delete(file);
+					deletedCount++;
+				} catch (error) {
+					console.error(`Failed to delete ${file.path}:`, error);
+				}
+			}
+
+			// Clean up empty plugin folders
+			await this.cleanupEmptyPluginFolders();
+
+			new Notice(`Cleanup complete! Deleted ${deletedCount} files.`);
+		}).open();
+	}
+
+	async cleanupEmptyPluginFolders() {
+		for (const folderName of Object.values(FOLDERS)) {
+			const folder = this.app.vault.getAbstractFileByPath(folderName);
+			if (folder instanceof TFolder) {
+				// Check if folder is empty
+				if (folder.children.length === 0) {
+					try {
+						await this.app.vault.delete(folder);
+					} catch (error) {
+						// Folder might not be empty or might have been deleted already
+						console.log(`Could not delete folder ${folderName}:`, error);
+					}
+				}
+			}
+		}
+	}
+
 	isMOC(file: TFile): boolean {
 		const cache = this.app.metadataCache.getFileCache(file);
 		return cache?.frontmatter?.tags?.includes('moc') ?? false;
@@ -668,6 +733,68 @@ class PromptDescriptionModal extends Modal {
 			cls: 'mod-cta'
 		});
 		addButton.addEventListener('click', submitFn);
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+class CleanupConfirmationModal extends Modal {
+	constructor(
+		app: App, 
+		private filesToDelete: TFile[],
+		private onConfirm: () => void
+	) {
+		super(app);
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.createEl('h2', { text: 'Cleanup MOC System Files' });
+
+		contentEl.createEl('p', { 
+			text: `This will permanently delete ${this.filesToDelete.length} files created by the MOC System Plugin.`
+		});
+
+		if (this.filesToDelete.length > 0) {
+			contentEl.createEl('p', { text: 'Files to be deleted:' });
+			const fileList = contentEl.createEl('ul');
+			fileList.style.maxHeight = '200px';
+			fileList.style.overflowY = 'auto';
+			fileList.style.border = '1px solid var(--background-modifier-border)';
+			fileList.style.padding = '10px';
+			fileList.style.marginBottom = '15px';
+
+			for (const file of this.filesToDelete) {
+				fileList.createEl('li', { text: file.path });
+			}
+		}
+
+		contentEl.createEl('p', { 
+			text: 'This action cannot be undone.',
+			cls: 'mod-warning'
+		});
+
+		const buttonContainer = contentEl.createDiv();
+		buttonContainer.style.display = 'flex';
+		buttonContainer.style.gap = '10px';
+		buttonContainer.style.marginTop = '15px';
+
+		const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
+		cancelButton.addEventListener('click', () => {
+			this.close();
+		});
+
+		const confirmButton = buttonContainer.createEl('button', { 
+			text: 'Delete All Files',
+			cls: 'mod-warning'
+		});
+		confirmButton.addEventListener('click', () => {
+			this.onConfirm();
+			this.close();
+		});
 	}
 
 	onClose() {
