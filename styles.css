@@ -2,7 +2,53 @@
 
 /* ==== BODY CLASSES FOR ACTIVE FILE STYLING ==== */
 
-/* MOC/Group Files - Blue and Bold */
+/* Root MOC Files - Individual Colors */
+body.smart-note-root-moc-red .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #dc2626 !important;
+    font-weight: bold !important;
+}
+
+body.smart-note-root-moc-orange .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #ea580c !important;
+    font-weight: bold !important;
+}
+
+body.smart-note-root-moc-yellow .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #ca8a04 !important;
+    font-weight: bold !important;
+}
+
+body.smart-note-root-moc-green .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #16a34a !important;
+    font-weight: bold !important;
+}
+
+body.smart-note-root-moc-blue .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #2563eb !important;
+    font-weight: bold !important;
+}
+
+body.smart-note-root-moc-purple .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #9333ea !important;
+    font-weight: bold !important;
+}
+
+body.smart-note-root-moc-brown .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #a16207 !important;
+    font-weight: bold !important;
+}
+
+body.smart-note-root-moc-gray .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #374151 !important;
+    font-weight: bold !important;
+}
+
+body.smart-note-root-moc-rose .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #be123c !important;
+    font-weight: bold !important;
+}
+
+/* MOC/Group Files - Blue and Bold (fallback for sub-MOCs) */
 body.smart-note-group .workspace-tab-header.is-active .workspace-tab-header-inner-title {
     color: #2563eb !important;
     font-weight: bold !important;
@@ -31,6 +77,42 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 }
 
 /* Dark mode adjustments for active file styling */
+.theme-dark body.smart-note-root-moc-red .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #ef4444 !important;
+}
+
+.theme-dark body.smart-note-root-moc-orange .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #fb923c !important;
+}
+
+.theme-dark body.smart-note-root-moc-yellow .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #eab308 !important;
+}
+
+.theme-dark body.smart-note-root-moc-green .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #4ade80 !important;
+}
+
+.theme-dark body.smart-note-root-moc-blue .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #60a5fa !important;
+}
+
+.theme-dark body.smart-note-root-moc-purple .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #a855f7 !important;
+}
+
+.theme-dark body.smart-note-root-moc-brown .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #d97706 !important;
+}
+
+.theme-dark body.smart-note-root-moc-gray .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #6b7280 !important;
+}
+
+.theme-dark body.smart-note-root-moc-rose .workspace-tab-header.is-active .workspace-tab-header-inner-title {
+    color: #f43f5e !important;
+}
+
 .theme-dark body.smart-note-group .workspace-tab-header.is-active .workspace-tab-header-inner-title {
     color: #60a5fa !important;
 }
@@ -53,8 +135,54 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 
 /* ==== FILE EXPLORER STYLING - Metadata-Based (Primary) ==== */
 
-/* MOC/Group Files - Blue and Bold */
-.nav-file-title[data-smart-note-type="group"] .nav-file-title-content {
+/* Root MOC Files - Individual Colors */
+.nav-file-title[data-smart-note-type="group"][data-root-moc-color="red"] .nav-file-title-content {
+    color: #dc2626 !important;
+    font-weight: bold !important;
+}
+
+.nav-file-title[data-smart-note-type="group"][data-root-moc-color="orange"] .nav-file-title-content {
+    color: #ea580c !important;
+    font-weight: bold !important;
+}
+
+.nav-file-title[data-smart-note-type="group"][data-root-moc-color="yellow"] .nav-file-title-content {
+    color: #ca8a04 !important;
+    font-weight: bold !important;
+}
+
+.nav-file-title[data-smart-note-type="group"][data-root-moc-color="green"] .nav-file-title-content {
+    color: #16a34a !important;
+    font-weight: bold !important;
+}
+
+.nav-file-title[data-smart-note-type="group"][data-root-moc-color="blue"] .nav-file-title-content {
+    color: #2563eb !important;
+    font-weight: bold !important;
+}
+
+.nav-file-title[data-smart-note-type="group"][data-root-moc-color="purple"] .nav-file-title-content {
+    color: #9333ea !important;
+    font-weight: bold !important;
+}
+
+.nav-file-title[data-smart-note-type="group"][data-root-moc-color="brown"] .nav-file-title-content {
+    color: #a16207 !important;
+    font-weight: bold !important;
+}
+
+.nav-file-title[data-smart-note-type="group"][data-root-moc-color="gray"] .nav-file-title-content {
+    color: #374151 !important;
+    font-weight: bold !important;
+}
+
+.nav-file-title[data-smart-note-type="group"][data-root-moc-color="rose"] .nav-file-title-content {
+    color: #be123c !important;
+    font-weight: bold !important;
+}
+
+/* MOC/Group Files - Blue and Bold (fallback for sub-MOCs without color attribute) */
+.nav-file-title[data-smart-note-type="group"]:not([data-root-moc-color]) .nav-file-title-content {
     color: #2563eb !important;
     font-weight: bold !important;
 }
@@ -114,8 +242,54 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 
 /* ==== TAB TITLE STYLING - Metadata-Based (Primary) ==== */
 
-/* MOC Tabs - Blue and Bold */
-.workspace-tab-header.smart-note-tab-group .workspace-tab-header-inner-title {
+/* Root MOC Tabs - Individual Colors */
+.workspace-tab-header.smart-note-tab-group[data-root-moc-color="red"] .workspace-tab-header-inner-title {
+    color: #dc2626 !important;
+    font-weight: bold !important;
+}
+
+.workspace-tab-header.smart-note-tab-group[data-root-moc-color="orange"] .workspace-tab-header-inner-title {
+    color: #ea580c !important;
+    font-weight: bold !important;
+}
+
+.workspace-tab-header.smart-note-tab-group[data-root-moc-color="yellow"] .workspace-tab-header-inner-title {
+    color: #ca8a04 !important;
+    font-weight: bold !important;
+}
+
+.workspace-tab-header.smart-note-tab-group[data-root-moc-color="green"] .workspace-tab-header-inner-title {
+    color: #16a34a !important;
+    font-weight: bold !important;
+}
+
+.workspace-tab-header.smart-note-tab-group[data-root-moc-color="blue"] .workspace-tab-header-inner-title {
+    color: #2563eb !important;
+    font-weight: bold !important;
+}
+
+.workspace-tab-header.smart-note-tab-group[data-root-moc-color="purple"] .workspace-tab-header-inner-title {
+    color: #9333ea !important;
+    font-weight: bold !important;
+}
+
+.workspace-tab-header.smart-note-tab-group[data-root-moc-color="brown"] .workspace-tab-header-inner-title {
+    color: #a16207 !important;
+    font-weight: bold !important;
+}
+
+.workspace-tab-header.smart-note-tab-group[data-root-moc-color="gray"] .workspace-tab-header-inner-title {
+    color: #374151 !important;
+    font-weight: bold !important;
+}
+
+.workspace-tab-header.smart-note-tab-group[data-root-moc-color="rose"] .workspace-tab-header-inner-title {
+    color: #be123c !important;
+    font-weight: bold !important;
+}
+
+/* MOC Tabs - Blue and Bold (fallback for sub-MOCs without color attribute) */
+.workspace-tab-header.smart-note-tab-group:not([data-root-moc-color]) .workspace-tab-header-inner-title {
     color: #2563eb !important;
     font-weight: bold !important;
 }
@@ -198,7 +372,43 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 /* ==== DARK MODE ADJUSTMENTS ==== */
 
 /* File Explorer - Dark Mode - Metadata-Based (Primary) */
-.theme-dark .nav-file-title[data-smart-note-type="group"] .nav-file-title-content {
+.theme-dark .nav-file-title[data-smart-note-type="group"][data-root-moc-color="red"] .nav-file-title-content {
+    color: #ef4444 !important;
+}
+
+.theme-dark .nav-file-title[data-smart-note-type="group"][data-root-moc-color="orange"] .nav-file-title-content {
+    color: #fb923c !important;
+}
+
+.theme-dark .nav-file-title[data-smart-note-type="group"][data-root-moc-color="yellow"] .nav-file-title-content {
+    color: #eab308 !important;
+}
+
+.theme-dark .nav-file-title[data-smart-note-type="group"][data-root-moc-color="green"] .nav-file-title-content {
+    color: #4ade80 !important;
+}
+
+.theme-dark .nav-file-title[data-smart-note-type="group"][data-root-moc-color="blue"] .nav-file-title-content {
+    color: #60a5fa !important;
+}
+
+.theme-dark .nav-file-title[data-smart-note-type="group"][data-root-moc-color="purple"] .nav-file-title-content {
+    color: #a855f7 !important;
+}
+
+.theme-dark .nav-file-title[data-smart-note-type="group"][data-root-moc-color="brown"] .nav-file-title-content {
+    color: #d97706 !important;
+}
+
+.theme-dark .nav-file-title[data-smart-note-type="group"][data-root-moc-color="gray"] .nav-file-title-content {
+    color: #6b7280 !important;
+}
+
+.theme-dark .nav-file-title[data-smart-note-type="group"][data-root-moc-color="rose"] .nav-file-title-content {
+    color: #f43f5e !important;
+}
+
+.theme-dark .nav-file-title[data-smart-note-type="group"]:not([data-root-moc-color]) .nav-file-title-content {
     color: #60a5fa !important;
 }
 
@@ -240,7 +450,43 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 }
 
 /* Tab Titles - Dark Mode - Metadata-Based (Primary) */
-.theme-dark .workspace-tab-header.smart-note-tab-group .workspace-tab-header-inner-title {
+.theme-dark .workspace-tab-header.smart-note-tab-group[data-root-moc-color="red"] .workspace-tab-header-inner-title {
+    color: #ef4444 !important;
+}
+
+.theme-dark .workspace-tab-header.smart-note-tab-group[data-root-moc-color="orange"] .workspace-tab-header-inner-title {
+    color: #fb923c !important;
+}
+
+.theme-dark .workspace-tab-header.smart-note-tab-group[data-root-moc-color="yellow"] .workspace-tab-header-inner-title {
+    color: #eab308 !important;
+}
+
+.theme-dark .workspace-tab-header.smart-note-tab-group[data-root-moc-color="green"] .workspace-tab-header-inner-title {
+    color: #4ade80 !important;
+}
+
+.theme-dark .workspace-tab-header.smart-note-tab-group[data-root-moc-color="blue"] .workspace-tab-header-inner-title {
+    color: #60a5fa !important;
+}
+
+.theme-dark .workspace-tab-header.smart-note-tab-group[data-root-moc-color="purple"] .workspace-tab-header-inner-title {
+    color: #a855f7 !important;
+}
+
+.theme-dark .workspace-tab-header.smart-note-tab-group[data-root-moc-color="brown"] .workspace-tab-header-inner-title {
+    color: #d97706 !important;
+}
+
+.theme-dark .workspace-tab-header.smart-note-tab-group[data-root-moc-color="gray"] .workspace-tab-header-inner-title {
+    color: #6b7280 !important;
+}
+
+.theme-dark .workspace-tab-header.smart-note-tab-group[data-root-moc-color="rose"] .workspace-tab-header-inner-title {
+    color: #f43f5e !important;
+}
+
+.theme-dark .workspace-tab-header.smart-note-tab-group:not([data-root-moc-color]) .workspace-tab-header-inner-title {
     color: #60a5fa !important;
 }
 
@@ -303,7 +549,63 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 
 /* ==== GRAPH VIEW STYLING ==== */
 
-/* MOC Nodes - Blue with Bold Outline */
+/* Root MOC Nodes - Individual Colors */
+.graph-view .node[data-path*="🔴 "] .node-background {
+    fill: #dc2626 !important;
+}
+
+.graph-view .node[data-path*="🔴 "] .node-title {
+    fill: white !important;
+    font-weight: bold !important;
+}
+
+.graph-view .node[data-path*="🔴 "] .node-ring {
+    stroke: #dc2626 !important;
+    stroke-width: 3px !important;
+}
+
+.graph-view .node[data-path*="🟠 "] .node-background {
+    fill: #ea580c !important;
+}
+
+.graph-view .node[data-path*="🟠 "] .node-title {
+    fill: white !important;
+    font-weight: bold !important;
+}
+
+.graph-view .node[data-path*="🟠 "] .node-ring {
+    stroke: #ea580c !important;
+    stroke-width: 3px !important;
+}
+
+.graph-view .node[data-path*="🟡 "] .node-background {
+    fill: #ca8a04 !important;
+}
+
+.graph-view .node[data-path*="🟡 "] .node-title {
+    fill: white !important;
+    font-weight: bold !important;
+}
+
+.graph-view .node[data-path*="🟡 "] .node-ring {
+    stroke: #ca8a04 !important;
+    stroke-width: 3px !important;
+}
+
+.graph-view .node[data-path*="🟢 "] .node-background {
+    fill: #16a34a !important;
+}
+
+.graph-view .node[data-path*="🟢 "] .node-title {
+    fill: white !important;
+    font-weight: bold !important;
+}
+
+.graph-view .node[data-path*="🟢 "] .node-ring {
+    stroke: #16a34a !important;
+    stroke-width: 3px !important;
+}
+
 .graph-view .node[data-path*="🔵 "] .node-background {
     fill: #2563eb !important;
 }
@@ -315,6 +617,62 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 
 .graph-view .node[data-path*="🔵 "] .node-ring {
     stroke: #2563eb !important;
+    stroke-width: 3px !important;
+}
+
+.graph-view .node[data-path*="🟣 "] .node-background {
+    fill: #9333ea !important;
+}
+
+.graph-view .node[data-path*="🟣 "] .node-title {
+    fill: white !important;
+    font-weight: bold !important;
+}
+
+.graph-view .node[data-path*="🟣 "] .node-ring {
+    stroke: #9333ea !important;
+    stroke-width: 3px !important;
+}
+
+.graph-view .node[data-path*="🟤 "] .node-background {
+    fill: #a16207 !important;
+}
+
+.graph-view .node[data-path*="🟤 "] .node-title {
+    fill: white !important;
+    font-weight: bold !important;
+}
+
+.graph-view .node[data-path*="🟤 "] .node-ring {
+    stroke: #a16207 !important;
+    stroke-width: 3px !important;
+}
+
+.graph-view .node[data-path*="⚫ "] .node-background {
+    fill: #374151 !important;
+}
+
+.graph-view .node[data-path*="⚫ "] .node-title {
+    fill: white !important;
+    font-weight: bold !important;
+}
+
+.graph-view .node[data-path*="⚫ "] .node-ring {
+    stroke: #374151 !important;
+    stroke-width: 3px !important;
+}
+
+.graph-view .node[data-path*="🔺 "] .node-background {
+    fill: #be123c !important;
+}
+
+.graph-view .node[data-path*="🔺 "] .node-title {
+    fill: white !important;
+    font-weight: bold !important;
+}
+
+.graph-view .node[data-path*="🔺 "] .node-ring {
+    stroke: #be123c !important;
     stroke-width: 3px !important;
 }
 
@@ -378,12 +736,76 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 }
 
 /* Graph View - Dark Mode Adjustments */
+.theme-dark .graph-view .node[data-path*="🔴 "] .node-background {
+    fill: #ef4444 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🔴 "] .node-ring {
+    stroke: #ef4444 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🟠 "] .node-background {
+    fill: #fb923c !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🟠 "] .node-ring {
+    stroke: #fb923c !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🟡 "] .node-background {
+    fill: #eab308 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🟡 "] .node-ring {
+    stroke: #eab308 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🟢 "] .node-background {
+    fill: #4ade80 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🟢 "] .node-ring {
+    stroke: #4ade80 !important;
+}
+
 .theme-dark .graph-view .node[data-path*="🔵 "] .node-background {
     fill: #60a5fa !important;
 }
 
 .theme-dark .graph-view .node[data-path*="🔵 "] .node-ring {
     stroke: #60a5fa !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🟣 "] .node-background {
+    fill: #a855f7 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🟣 "] .node-ring {
+    stroke: #a855f7 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🟤 "] .node-background {
+    fill: #d97706 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🟤 "] .node-ring {
+    stroke: #d97706 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="⚫ "] .node-background {
+    fill: #6b7280 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="⚫ "] .node-ring {
+    stroke: #6b7280 !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🔺 "] .node-background {
+    fill: #f43f5e !important;
+}
+
+.theme-dark .graph-view .node[data-path*="🔺 "] .node-ring {
+    stroke: #f43f5e !important;
 }
 
 .theme-dark .graph-view .node[data-path*="📝 "] .node-background {
@@ -420,8 +842,16 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 
 /* ==== ENHANCED NODE SIZING FOR VISUAL HIERARCHY ==== */
 
-/* Make MOC files larger to show importance */
-.graph-view .node[data-path*="🔵 "] {
+/* Make all MOC files larger to show importance */
+.graph-view .node[data-path*="🔴 "],
+.graph-view .node[data-path*="🟠 "],
+.graph-view .node[data-path*="🟡 "],
+.graph-view .node[data-path*="🟢 "],
+.graph-view .node[data-path*="🔵 "],
+.graph-view .node[data-path*="🟣 "],
+.graph-view .node[data-path*="🟤 "],
+.graph-view .node[data-path*="⚫ "],
+.graph-view .node[data-path*="🔺 "] {
     transform: scale(1.2) !important;
 }
 

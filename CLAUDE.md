@@ -17,7 +17,7 @@ The primary goal of this plugin is to automate the user's MOC-based system for o
 
 ### File Organization Structure
 
-- **Top-level MOCs**: Created in vault root directory with 🔵 emoji prefix and "MOC" suffix
+- **Top-level MOCs**: Created in vault root directory with random colored emoji prefix and "MOC" suffix
 - **Sub-MOCs**: Stored in `MOCs/` folder with 🔵 emoji prefix and "MOC" suffix
 - **Notes**: Stored in `Notes/` folder with 📝 emoji prefix  
 - **Resources**: Stored in `Resources/` folder with 📁 emoji prefix
@@ -77,13 +77,15 @@ The prompt system is designed for iterative LLM conversations:
 **New Feature**: Visual distinction for note types
 
 - **Emoji Prefixes**: All created notes include type-specific emojis:
-  - MOCs: 🔵 (Blue circle)
+  - Root MOCs: Random colored circle emoji (🔴🟠🟡🟢🔵🟣🟤⚫🔺)
+  - Sub-MOCs: 🔵 (Blue circle)
   - Notes: 📝 (Memo emoji)
   - Resources: 📁 (Folder emoji)  
   - Prompts: 🤖 (Robot emoji)
 
 - **CSS Color Coding**: Unique colors for each note type:
-  - MOCs/Groups: Blue (#2563eb) with bold styling
+  - Root MOCs: Individual colors based on assigned emoji with bold styling
+  - Sub-MOCs: Blue (#2563eb) with bold styling
   - Notes: Green (#16a34a)
   - Resources: Orange (#ea580c)
   - Prompt Hubs: Dark Purple (#9333ea) with bold styling
@@ -105,7 +107,16 @@ The prompt system is designed for iterative LLM conversations:
 - Preserves plugin folders (MOCs/, Notes/, Resources/, Prompts/) for reuse
 - Preserves all pre-existing files without plugin metadata
 
-### 6. Automatic Features
+### 6. Random Color System for Root MOCs
+**Latest Feature**: Visual distinction for root-level MOCs
+
+- **Hash-based Color Assignment**: Each root MOC gets a consistent color based on its name
+- **9 Available Colors**: Red, orange, yellow, green, blue, purple, brown, gray, rose
+- **Consistent Styling**: Colors apply to file explorer, tabs, active file indicators, and graph view
+- **Backward Compatibility**: Existing colored MOCs are properly detected and styled
+- **Sub-MOC Distinction**: Only root MOCs get random colors; sub-MOCs remain blue
+
+### 7. Automatic Features
 
 - **Folder Structure**: Creates required folders on plugin load
 - **Section Management**: Intelligently reorganizes MOC content to keep plugin sections at the top
@@ -128,8 +139,8 @@ export default class MOCSystemPlugin extends Plugin {
 ### Key Methods
 
 #### Content Creation Methods
-- `createMOC()`: Creates top-level MOC with emoji prefix, "MOC" suffix, frontmatter tags, and note-type metadata
-- `createSubMOC()`: Creates MOC in MOCs/ folder with emoji prefix, "MOC" suffix, and links from parent
+- `createMOC()`: Creates top-level MOC with random colored emoji prefix, "MOC" suffix, frontmatter tags, and note-type metadata
+- `createSubMOC()`: Creates MOC in MOCs/ folder with blue emoji prefix, "MOC" suffix, and links from parent
 - `createNote()`: Creates note in Notes/ folder with emoji prefix and links from parent MOC
 - `createResource()`: Creates resource in Resources/ folder with emoji prefix and links from parent
 - `createPrompt()`: Creates prompt hub and iteration with emoji prefixes, metadata, and LLM links block
@@ -156,9 +167,14 @@ export default class MOCSystemPlugin extends Plugin {
 #### Styling System
 - `getNoteType()`: Determines note type from frontmatter metadata
 - `getFileDisplayType()`: Differentiates between prompt hubs and iterations for styling
-- `updateStylingClasses()`: Updates body classes based on active file for CSS targeting
-- `updateFileExplorerStyling()`: Adds data attributes to file explorer items
-- `updateTabStyling()`: Adds classes and data attributes to tab headers
+- `updateStylingClasses()`: Updates body classes based on active file for CSS targeting, includes root MOC color classes
+- `updateFileExplorerStyling()`: Adds data attributes to file explorer items, including root MOC color attributes
+- `updateTabStyling()`: Adds classes and data attributes to tab headers, including root MOC color attributes
+
+#### Root MOC Color System
+- `hashString()`: Generates consistent hash from string for color assignment
+- `getRootMOCColor()`: Returns color configuration for root MOC, detecting existing colors or assigning new ones
+- `isRootMOC()`: Determines if a MOC is a root-level MOC (not in subfolder)
 
 #### Maintenance
 - `cleanupBrokenLinks()`: Removes references to deleted files and cleans up orphaned blank lines
@@ -195,6 +211,8 @@ The plugin includes several custom modals for user input:
 3. **Dynamic sections**: Sections only appear when needed, keeping MOCs clean
 4. **Regex-based parsing**: For version detection and link patterns
 5. **Batch link opening**: Uses window.open() in a loop for multi-link functionality
+6. **Hash-based color assignment**: Ensures consistent colors for root MOCs across sessions without storing state
+7. **Emoji-based color detection**: Uses emoji prefixes to determine colors for backward compatibility
 
 ## Current Status
 
@@ -214,6 +232,7 @@ The plugin has been fully implemented with all requested features plus recent im
 - ✅ **NEW**: Robust content reorganization that moves plugin sections to top while preserving user content
 - ✅ **NEW**: Enhanced folder preservation during cleanup (folders are kept, only files removed)
 - ✅ **FIXED**: Blank line preservation issue - plugin no longer preserves orphaned blank lines from deleted entries
+- ✅ **LATEST**: Random color system for root MOCs - hash-based assignment with 9 unique colors
 
 The plugin has been built and tested successfully with all features implemented and working.
 

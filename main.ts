@@ -18,9 +18,22 @@ const FOLDERS = {
 const SECTION_ORDER = ['MOCs', 'Notes', 'Resources', 'Prompts'] as const;
 type SectionType = typeof SECTION_ORDER[number];
 
+// Root MOC color system
+const ROOT_MOC_COLORS = [
+	{ emoji: '🔴', lightColor: '#dc2626', darkColor: '#ef4444', name: 'red' },
+	{ emoji: '🟠', lightColor: '#ea580c', darkColor: '#fb923c', name: 'orange' },
+	{ emoji: '🟡', lightColor: '#ca8a04', darkColor: '#eab308', name: 'yellow' },
+	{ emoji: '🟢', lightColor: '#16a34a', darkColor: '#4ade80', name: 'green' },
+	{ emoji: '🔵', lightColor: '#2563eb', darkColor: '#60a5fa', name: 'blue' },
+	{ emoji: '🟣', lightColor: '#9333ea', darkColor: '#a855f7', name: 'purple' },
+	{ emoji: '🟤', lightColor: '#a16207', darkColor: '#d97706', name: 'brown' },
+	{ emoji: '⚫', lightColor: '#374151', darkColor: '#6b7280', name: 'gray' },
+	{ emoji: '🔺', lightColor: '#be123c', darkColor: '#f43f5e', name: 'rose' }
+] as const;
+
 // Note type configurations with emojis and classes
 const NOTE_TYPES = {
-	MOCs: { emoji: '🔵', class: 'moc' },
+	MOCs: { emoji: '🔵', class: 'moc' }, // Default for sub-MOCs
 	Notes: { emoji: '📝', class: 'note' },
 	Resources: { emoji: '📁', class: 'resource' },
 	Prompts: { emoji: '🤖', class: 'prompt' }
@@ -156,7 +169,11 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	async createMOC(name: string): Promise<TFile> {
-		const fileName = `${NOTE_TYPES.MOCs.emoji} ${name} MOC.md`;
+		// Get random color for this root MOC
+		const hash = this.hashString(name);
+		const colorConfig = ROOT_MOC_COLORS[hash % ROOT_MOC_COLORS.length];
+		
+		const fileName = `${colorConfig.emoji} ${name} MOC.md`;
 		const content = `---\ntags:\n  - moc\nnote-type: moc\n---\n`;
 		
 		const file = await this.app.vault.create(fileName, content);
@@ -695,13 +712,24 @@ export default class MOCSystemPlugin extends Plugin {
 	updateStylingClasses() {
 		const activeFile = this.app.workspace.getActiveFile();
 		
-		// Remove all existing note type classes
+		// Remove all existing note type classes and root MOC color classes
 		document.body.classList.remove('smart-note-group', 'smart-note-note', 'smart-note-prompt', 'smart-note-resource', 'smart-note-prompt-hub', 'smart-note-prompt-iteration');
+		
+		// Remove any existing root MOC color classes
+		ROOT_MOC_COLORS.forEach(color => {
+			document.body.classList.remove(`smart-note-root-moc-${color.name}`);
+		});
 		
 		if (activeFile) {
 			const displayType = this.getFileDisplayType(activeFile);
 			if (displayType === 'moc') {
 				document.body.classList.add('smart-note-group');
+				
+				// Add root MOC color class for styling
+				if (this.isRootMOC(activeFile)) {
+					const colorName = this.getRootMOCColor(activeFile).name;
+					document.body.classList.add(`smart-note-root-moc-${colorName}`);
+				}
 			} else if (displayType !== 'unknown') {
 				document.body.classList.add(`smart-note-${displayType}`);
 			}
@@ -712,6 +740,9 @@ export default class MOCSystemPlugin extends Plugin {
 		// Add data attributes to file explorer items for CSS targeting
 		const fileItems = document.querySelectorAll('.nav-file-title');
 		fileItems.forEach((item: HTMLElement) => {
+			// Remove existing attributes
+			item.removeAttribute('data-root-moc-color');
+			
 			const path = item.getAttribute('data-path');
 			if (path) {
 				const file = this.app.vault.getAbstractFileByPath(path);
@@ -719,6 +750,12 @@ export default class MOCSystemPlugin extends Plugin {
 					const displayType = this.getFileDisplayType(file);
 					if (displayType === 'moc') {
 						item.setAttribute('data-smart-note-type', 'group');
+						
+						// Add color attribute for root MOCs
+						if (this.isRootMOC(file)) {
+							const colorName = this.getRootMOCColor(file).name;
+							item.setAttribute('data-root-moc-color', colorName);
+						}
 					} else if (displayType !== 'unknown') {
 						item.setAttribute('data-smart-note-type', displayType);
 					}
@@ -734,6 +771,7 @@ export default class MOCSystemPlugin extends Plugin {
 			// Remove existing classes
 			tab.classList.remove('smart-note-tab-group', 'smart-note-tab-note', 'smart-note-tab-prompt', 'smart-note-tab-resource', 'smart-note-tab-prompt-hub', 'smart-note-tab-prompt-iteration');
 			tab.removeAttribute('data-smart-note-type');
+			tab.removeAttribute('data-root-moc-color');
 			
 			const ariaLabel = tab.getAttribute('aria-label');
 			if (ariaLabel) {
@@ -743,6 +781,12 @@ export default class MOCSystemPlugin extends Plugin {
 					if (displayType === 'moc') {
 						tab.classList.add('smart-note-tab-group');
 						tab.setAttribute('data-smart-note-type', 'group');
+						
+						// Add color attribute for root MOCs
+						if (this.isRootMOC(file)) {
+							const colorName = this.getRootMOCColor(file).name;
+							tab.setAttribute('data-root-moc-color', colorName);
+						}
 					} else if (displayType !== 'unknown') {
 						tab.classList.add(`smart-note-tab-${displayType}`);
 						tab.setAttribute('data-smart-note-type', displayType);
@@ -750,6 +794,38 @@ export default class MOCSystemPlugin extends Plugin {
 				}
 			}
 		});
+	}
+
+	// Helper methods for root MOC color system
+	private hashString(str: string): number {
+		let hash = 0;
+		for (let i = 0; i < str.length; i++) {
+			const char = str.charCodeAt(i);
+			hash = ((hash << 5) - hash) + char;
+			hash = hash & hash; // Convert to 32bit integer
+		}
+		return Math.abs(hash);
+	}
+
+	private getRootMOCColor(file: TFile): typeof ROOT_MOC_COLORS[number] {
+		// First check if the file already has a colored emoji and return its corresponding color
+		const existingColorMatch = file.basename.match(/^([🔴🟠🟡🟢🔵🟣🟤⚫🔺])\s+/);
+		if (existingColorMatch) {
+			const emoji = existingColorMatch[1];
+			const foundColor = ROOT_MOC_COLORS.find(color => color.emoji === emoji);
+			if (foundColor) {
+				return foundColor;
+			}
+		}
+		
+		// Fallback: Use the MOC name (without emoji and " MOC") for consistent hashing
+		const baseName = file.basename.replace(/^[🔴🟠🟡🟢🔵🟣🟤⚫🔺]\s+/, '').replace(/\s+MOC$/, '');
+		const hash = this.hashString(baseName);
+		return ROOT_MOC_COLORS[hash % ROOT_MOC_COLORS.length];
+	}
+
+	private isRootMOC(file: TFile): boolean {
+		return this.isMOC(file) && !file.path.includes('/');
 	}
 }
 
