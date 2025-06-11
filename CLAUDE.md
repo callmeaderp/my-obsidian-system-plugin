@@ -161,7 +161,8 @@ export default class MOCSystemPlugin extends Plugin {
 - `updateTabStyling()`: Adds classes and data attributes to tab headers
 
 #### Maintenance
-- `cleanupBrokenLinks()`: Removes references to deleted files
+- `cleanupBrokenLinks()`: Removes references to deleted files and cleans up orphaned blank lines
+- `cleanupOrphanedBlankLines()`: Helper method to remove blank lines left after link deletion in plugin sections
 - `ensureFolderStructure()`: Creates required folders if missing
 - `cleanupMOCSystem()`: Removes all plugin-created files based on note-type metadata
 - `cleanupEmptyPluginFolders()`: Removes empty plugin folders after cleanup
@@ -212,6 +213,7 @@ The plugin has been fully implemented with all requested features plus recent im
 - ✅ **NEW**: System cleanup command for safe removal of all plugin-created files
 - ✅ **NEW**: Robust content reorganization that moves plugin sections to top while preserving user content
 - ✅ **NEW**: Enhanced folder preservation during cleanup (folders are kept, only files removed)
+- ✅ **FIXED**: Blank line preservation issue - plugin no longer preserves orphaned blank lines from deleted entries
 
 The plugin has been built and tested successfully with all features implemented and working.
 

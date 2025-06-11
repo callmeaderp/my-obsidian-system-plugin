@@ -271,7 +271,8 @@ export default class MOCSystemPlugin extends Plugin {
 				linkInsertIndex++;
 			}
 			
-			// Find end of plugin-managed links (stop at user content or next section)
+			// Find where to insert among plugin-managed links
+			let lastPluginLinkIndex = linkInsertIndex - 1;
 			while (linkInsertIndex < reorganizedLines.length) {
 				const line = reorganizedLines[linkInsertIndex].trim();
 				
@@ -280,21 +281,24 @@ export default class MOCSystemPlugin extends Plugin {
 					break;
 				}
 				
-				// Stop at user content (non-link, non-empty lines)
-				if (line !== '' && !line.match(/^-\s*\[\[.+\]\]$/)) {
+				// If it's a plugin link, track it
+				if (line.match(/^-\s*\[\[.+\]\]$/)) {
+					lastPluginLinkIndex = linkInsertIndex;
+					linkInsertIndex++;
+					continue;
+				}
+				
+				// Stop at user content (non-empty, non-link lines)
+				if (line !== '') {
 					break;
 				}
 				
-				// Continue if it's a plugin link or empty line
-				if (line === '' || line.match(/^-\s*\[\[.+\]\]$/)) {
-					linkInsertIndex++;
-				} else {
-					break;
-				}
+				// Skip empty lines to find more plugin links
+				linkInsertIndex++;
 			}
 			
-			// Insert the new link
-			reorganizedLines.splice(linkInsertIndex, 0, `- [[${newFile.basename}]]`);
+			// Insert right after the last plugin link (no blank lines between plugin links)
+			reorganizedLines.splice(lastPluginLinkIndex + 1, 0, `- [[${newFile.basename}]]`);
 		}
 		
 		await this.app.vault.modify(moc, reorganizedLines.join('\n'));
@@ -509,13 +513,90 @@ export default class MOCSystemPlugin extends Plugin {
 			
 			if (linkPattern.test(content)) {
 				const lines = content.split('\n');
-				const newLines = lines.filter(line => !line.includes(`[[${deletedFile.basename}]]`));
+				const newLines: string[] = [];
+				let removedLinkIndex = -1;
 				
-				if (lines.length !== newLines.length) {
+				// First pass: remove lines with the broken link and track where they were
+				for (let i = 0; i < lines.length; i++) {
+					if (lines[i].includes(`[[${deletedFile.basename}]]`)) {
+						removedLinkIndex = i;
+					} else {
+						newLines.push(lines[i]);
+					}
+				}
+				
+				// Second pass: clean up orphaned blank lines in plugin sections
+				if (removedLinkIndex !== -1) {
+					const cleanedLines = this.cleanupOrphanedBlankLines(newLines, file);
+					if (lines.length !== cleanedLines.length || lines.join('\n') !== cleanedLines.join('\n')) {
+						await this.app.vault.modify(file, cleanedLines.join('\n'));
+					}
+				} else if (lines.length !== newLines.length) {
+					// No cleanup needed, just save if changed
 					await this.app.vault.modify(file, newLines.join('\n'));
 				}
 			}
 		}
+	}
+
+	private cleanupOrphanedBlankLines(lines: string[], file: TFile): string[] {
+		// Only cleanup blank lines in MOCs
+		if (!this.isMOC(file)) {
+			return lines;
+		}
+		
+		const result: string[] = [];
+		let inPluginSection = false;
+		let sectionHasContent = false;
+		
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			const trimmedLine = line.trim();
+			
+			// Check if we're entering a plugin section
+			if (trimmedLine.startsWith('## ') && SECTION_ORDER.includes(trimmedLine.substring(3) as SectionType)) {
+				inPluginSection = true;
+				sectionHasContent = false;
+				result.push(line);
+				continue;
+			}
+			
+			// Check if we're leaving a plugin section
+			if (trimmedLine.startsWith('## ') && !SECTION_ORDER.includes(trimmedLine.substring(3) as SectionType)) {
+				inPluginSection = false;
+			}
+			
+			// In plugin section: only keep blank lines if there's content after them
+			if (inPluginSection) {
+				if (trimmedLine === '') {
+					// Look ahead to see if there's content coming
+					let hasContentAfter = false;
+					for (let j = i + 1; j < lines.length; j++) {
+						const nextLine = lines[j].trim();
+						if (nextLine.startsWith('## ')) {
+							break;
+						}
+						if (nextLine !== '') {
+							hasContentAfter = true;
+							break;
+						}
+					}
+					// Only keep the blank line if we have content in the section and content after
+					if (sectionHasContent && hasContentAfter) {
+						result.push(line);
+					}
+				} else {
+					// Non-blank line in plugin section
+					sectionHasContent = true;
+					result.push(line);
+				}
+			} else {
+				// Outside plugin sections, keep everything
+				result.push(line);
+			}
+		}
+		
+		return result;
 	}
 
 	async cleanupMOCSystem() {
