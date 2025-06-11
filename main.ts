@@ -18,17 +18,29 @@ const FOLDERS = {
 const SECTION_ORDER = ['MOCs', 'Notes', 'Resources', 'Prompts'] as const;
 type SectionType = typeof SECTION_ORDER[number];
 
-// Root MOC color system
-const ROOT_MOC_COLORS = [
-	{ emoji: '🔴', lightColor: '#dc2626', darkColor: '#ef4444', name: 'red' },
-	{ emoji: '🟠', lightColor: '#ea580c', darkColor: '#fb923c', name: 'orange' },
-	{ emoji: '🟡', lightColor: '#ca8a04', darkColor: '#eab308', name: 'yellow' },
-	{ emoji: '🟢', lightColor: '#16a34a', darkColor: '#4ade80', name: 'green' },
-	{ emoji: '🔵', lightColor: '#2563eb', darkColor: '#60a5fa', name: 'blue' },
-	{ emoji: '🟣', lightColor: '#9333ea', darkColor: '#a855f7', name: 'purple' },
-	{ emoji: '🟤', lightColor: '#a16207', darkColor: '#d97706', name: 'brown' },
-	{ emoji: '⚫', lightColor: '#374151', darkColor: '#6b7280', name: 'gray' },
-	{ emoji: '🔺', lightColor: '#be123c', darkColor: '#f43f5e', name: 'rose' }
+// Legacy color mappings for backward compatibility with old emoji-based system
+const LEGACY_EMOJI_TO_COLOR: { [key: string]: string } = {
+	'🔴': 'red',
+	'🟠': 'orange', 
+	'🟡': 'yellow',
+	'🟢': 'green',
+	'🔵': 'blue',
+	'🟣': 'purple',
+	'🟤': 'brown',
+	'⚫': 'gray',
+	'🔺': 'rose'
+};
+
+const LEGACY_COLORS = [
+	{ lightColor: '#dc2626', darkColor: '#ef4444', name: 'red' },
+	{ lightColor: '#ea580c', darkColor: '#fb923c', name: 'orange' },
+	{ lightColor: '#ca8a04', darkColor: '#eab308', name: 'yellow' },
+	{ lightColor: '#16a34a', darkColor: '#4ade80', name: 'green' },
+	{ lightColor: '#2563eb', darkColor: '#60a5fa', name: 'blue' },
+	{ lightColor: '#9333ea', darkColor: '#a855f7', name: 'purple' },
+	{ lightColor: '#a16207', darkColor: '#d97706', name: 'brown' },
+	{ lightColor: '#374151', darkColor: '#6b7280', name: 'gray' },
+	{ lightColor: '#be123c', darkColor: '#f43f5e', name: 'rose' }
 ] as const;
 
 // Note type configurations with emojis and classes
@@ -90,6 +102,13 @@ export default class MOCSystemPlugin extends Plugin {
 			id: 'cleanup-moc-system',
 			name: 'Cleanup MOC system files',
 			callback: () => this.cleanupMOCSystem()
+		});
+
+		// Test command for random system (development only)
+		this.addCommand({
+			id: 'test-random-system',
+			name: 'Test random emoji and color system',
+			callback: () => this.testRandomSystem()
 		});
 
 		// Auto-cleanup on file deletion
@@ -169,12 +188,12 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	async createMOC(name: string): Promise<TFile> {
-		// Get random color for this root MOC
-		const hash = this.hashString(name);
-		const colorConfig = ROOT_MOC_COLORS[hash % ROOT_MOC_COLORS.length];
+		// Get random emoji and color for this root MOC
+		const randomEmoji = this.getRandomEmoji();
+		const randomColor = this.generateRandomColor();
 		
-		const fileName = `${colorConfig.emoji} ${name} MOC.md`;
-		const content = `---\ntags:\n  - moc\nnote-type: moc\n---\n`;
+		const fileName = `${randomEmoji} ${name} MOC.md`;
+		const content = `---\ntags:\n  - moc\nnote-type: moc\nroot-moc-color: ${randomColor.hex}\nroot-moc-light-color: ${randomColor.lightColor}\nroot-moc-dark-color: ${randomColor.darkColor}\n---\n`;
 		
 		const file = await this.app.vault.create(fileName, content);
 		await this.app.workspace.getLeaf().openFile(file);
@@ -616,6 +635,47 @@ export default class MOCSystemPlugin extends Plugin {
 		return result;
 	}
 
+	async testRandomSystem() {
+		console.log('Testing unlimited random emoji and color system...');
+		
+		// Test random emoji selection
+		const emojis = new Set<string>();
+		for (let i = 0; i < 20; i++) {
+			emojis.add(this.getRandomEmoji());
+		}
+		console.log('Random emojis generated:', Array.from(emojis));
+		
+		// Test random color generation
+		const colors: Array<{ lightColor: string, darkColor: string, hex: string }> = [];
+		for (let i = 0; i < 5; i++) {
+			const color = this.generateRandomColor();
+			colors.push(color);
+			console.log(`Random color ${i + 1}:`, color);
+		}
+		
+		// Create a test MOC to verify the system works
+		try {
+			const testFile = await this.createMOC('Test Unlimited Random System');
+			const content = await this.app.vault.read(testFile);
+			console.log('Test MOC created successfully');
+			console.log('Filename:', testFile.basename);
+			console.log('Content preview:', content.substring(0, 300));
+			
+			// Test the color retrieval system
+			const retrievedColor = this.getRootMOCColor(testFile);
+			console.log('Retrieved color:', retrievedColor);
+			
+			// Clean up test file
+			await this.app.vault.delete(testFile);
+			console.log('Test MOC cleaned up');
+			
+			new Notice('Unlimited random system test completed - check console for details');
+		} catch (error) {
+			console.error('Error during random system test:', error);
+			new Notice('Random system test failed - check console for details');
+		}
+	}
+
 	async cleanupMOCSystem() {
 		// Find all files created by the plugin
 		const allFiles = this.app.vault.getMarkdownFiles();
@@ -715,20 +775,36 @@ export default class MOCSystemPlugin extends Plugin {
 		// Remove all existing note type classes and root MOC color classes
 		document.body.classList.remove('smart-note-group', 'smart-note-note', 'smart-note-prompt', 'smart-note-resource', 'smart-note-prompt-hub', 'smart-note-prompt-iteration');
 		
-		// Remove any existing root MOC color classes
-		ROOT_MOC_COLORS.forEach(color => {
+		// Remove any existing root MOC color classes (legacy)
+		LEGACY_COLORS.forEach(color => {
 			document.body.classList.remove(`smart-note-root-moc-${color.name}`);
 		});
+		
+		// Remove any existing random color classes
+		const existingColorClasses = Array.from(document.body.classList).filter(cls => cls.startsWith('smart-note-root-moc-random-'));
+		existingColorClasses.forEach(cls => document.body.classList.remove(cls));
 		
 		if (activeFile) {
 			const displayType = this.getFileDisplayType(activeFile);
 			if (displayType === 'moc') {
 				document.body.classList.add('smart-note-group');
 				
-				// Add root MOC color class for styling
+				// Add root MOC color styling
 				if (this.isRootMOC(activeFile)) {
-					const colorName = this.getRootMOCColor(activeFile).name;
-					document.body.classList.add(`smart-note-root-moc-${colorName}`);
+					const color = this.getRootMOCColor(activeFile);
+					
+					// For new random colors, create a dynamic class
+					if (color.name.startsWith('#')) {
+						const colorId = color.name.replace('#', '');
+						const className = `smart-note-root-moc-random-${colorId}`;
+						document.body.classList.add(className);
+						
+						// Inject CSS for this specific color if not already present
+						this.injectRandomColorCSS(colorId, color.lightColor, color.darkColor);
+					} else {
+						// Legacy named colors
+						document.body.classList.add(`smart-note-root-moc-${color.name}`);
+					}
 				}
 			} else if (displayType !== 'unknown') {
 				document.body.classList.add(`smart-note-${displayType}`);
@@ -742,6 +818,7 @@ export default class MOCSystemPlugin extends Plugin {
 		fileItems.forEach((item: HTMLElement) => {
 			// Remove existing attributes
 			item.removeAttribute('data-root-moc-color');
+			item.removeAttribute('data-root-moc-random-color');
 			
 			const path = item.getAttribute('data-path');
 			if (path) {
@@ -753,8 +830,17 @@ export default class MOCSystemPlugin extends Plugin {
 						
 						// Add color attribute for root MOCs
 						if (this.isRootMOC(file)) {
-							const colorName = this.getRootMOCColor(file).name;
-							item.setAttribute('data-root-moc-color', colorName);
+							const color = this.getRootMOCColor(file);
+							
+							if (color.name.startsWith('#')) {
+								// New random color system
+								item.setAttribute('data-root-moc-random-color', color.name);
+								item.style.setProperty('--root-moc-color-light', color.lightColor);
+								item.style.setProperty('--root-moc-color-dark', color.darkColor);
+							} else {
+								// Legacy named colors
+								item.setAttribute('data-root-moc-color', color.name);
+							}
 						}
 					} else if (displayType !== 'unknown') {
 						item.setAttribute('data-smart-note-type', displayType);
@@ -768,10 +854,11 @@ export default class MOCSystemPlugin extends Plugin {
 		// Add classes to tab headers for CSS targeting
 		const tabHeaders = document.querySelectorAll('.workspace-tab-header');
 		tabHeaders.forEach((tab: HTMLElement) => {
-			// Remove existing classes
+			// Remove existing classes and attributes
 			tab.classList.remove('smart-note-tab-group', 'smart-note-tab-note', 'smart-note-tab-prompt', 'smart-note-tab-resource', 'smart-note-tab-prompt-hub', 'smart-note-tab-prompt-iteration');
 			tab.removeAttribute('data-smart-note-type');
 			tab.removeAttribute('data-root-moc-color');
+			tab.removeAttribute('data-root-moc-random-color');
 			
 			const ariaLabel = tab.getAttribute('aria-label');
 			if (ariaLabel) {
@@ -784,8 +871,17 @@ export default class MOCSystemPlugin extends Plugin {
 						
 						// Add color attribute for root MOCs
 						if (this.isRootMOC(file)) {
-							const colorName = this.getRootMOCColor(file).name;
-							tab.setAttribute('data-root-moc-color', colorName);
+							const color = this.getRootMOCColor(file);
+							
+							if (color.name.startsWith('#')) {
+								// New random color system
+								tab.setAttribute('data-root-moc-random-color', color.name);
+								tab.style.setProperty('--root-moc-color-light', color.lightColor);
+								tab.style.setProperty('--root-moc-color-dark', color.darkColor);
+							} else {
+								// Legacy named colors
+								tab.setAttribute('data-root-moc-color', color.name);
+							}
 						}
 					} else if (displayType !== 'unknown') {
 						tab.classList.add(`smart-note-tab-${displayType}`);
@@ -796,7 +892,92 @@ export default class MOCSystemPlugin extends Plugin {
 		});
 	}
 
+	private injectRandomColorCSS(colorId: string, lightColor: string, darkColor: string) {
+		// Check if CSS for this color already exists
+		const existingStyle = document.getElementById(`random-color-${colorId}`);
+		if (existingStyle) return;
+		
+		// Create CSS for this specific random color
+		const style = document.createElement('style');
+		style.id = `random-color-${colorId}`;
+		style.textContent = `
+			/* Random color styling for ${colorId} */
+			body.smart-note-root-moc-random-${colorId} .view-header-title {
+				color: ${lightColor} !important;
+				font-weight: bold !important;
+			}
+			
+			.theme-dark body.smart-note-root-moc-random-${colorId} .view-header-title {
+				color: ${darkColor} !important;
+			}
+			
+			/* File explorer styling */
+			.nav-file-title[data-root-moc-random-color="${lightColor}"] {
+				color: var(--root-moc-color-light) !important;
+				font-weight: bold !important;
+			}
+			
+			.theme-dark .nav-file-title[data-root-moc-random-color="${lightColor}"] {
+				color: var(--root-moc-color-dark) !important;
+			}
+			
+			/* Tab styling */
+			.workspace-tab-header[data-root-moc-random-color="${lightColor}"] .workspace-tab-header-inner-title {
+				color: var(--root-moc-color-light) !important;
+				font-weight: bold !important;
+			}
+			
+			.theme-dark .workspace-tab-header[data-root-moc-random-color="${lightColor}"] .workspace-tab-header-inner-title {
+				color: var(--root-moc-color-dark) !important;
+			}
+		`;
+		
+		document.head.appendChild(style);
+	}
+
 	// Helper methods for root MOC color system
+	private generateRandomColor(): { lightColor: string, darkColor: string, hex: string } {
+		// Generate completely random RGB values
+		const r = Math.floor(Math.random() * 256);
+		const g = Math.floor(Math.random() * 256);
+		const b = Math.floor(Math.random() * 256);
+		
+		const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+		
+		// For dark mode, lighten the color slightly
+		const lightR = Math.min(255, r + 40);
+		const lightG = Math.min(255, g + 40);
+		const lightB = Math.min(255, b + 40);
+		const lightHex = `#${lightR.toString(16).padStart(2, '0')}${lightG.toString(16).padStart(2, '0')}${lightB.toString(16).padStart(2, '0')}`;
+		
+		return {
+			lightColor: hex,
+			darkColor: lightHex,
+			hex: hex
+		};
+	}
+
+	private getRandomEmoji(): string {
+		// Generate truly random emoji from the entire emoji range
+		// Unicode emoji blocks: U+1F600-U+1F64F, U+1F300-U+1F5FF, U+1F680-U+1F6FF, U+1F900-U+1F9FF, U+2600-U+26FF, U+2700-U+27BF
+		const emojiRanges = [
+			[0x1F600, 0x1F64F], // Emoticons
+			[0x1F300, 0x1F5FF], // Misc Symbols and Pictographs
+			[0x1F680, 0x1F6FF], // Transport and Map Symbols
+			[0x1F900, 0x1F9FF], // Supplemental Symbols and Pictographs
+			[0x2600, 0x26FF],   // Miscellaneous Symbols
+			[0x2700, 0x27BF]    // Dingbats
+		];
+		
+		// Pick a random range
+		const range = emojiRanges[Math.floor(Math.random() * emojiRanges.length)];
+		
+		// Pick a random code point within that range
+		const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
+		
+		return String.fromCodePoint(codePoint);
+	}
+
 	private hashString(str: string): number {
 		let hash = 0;
 		for (let i = 0; i < str.length; i++) {
@@ -807,21 +988,49 @@ export default class MOCSystemPlugin extends Plugin {
 		return Math.abs(hash);
 	}
 
-	private getRootMOCColor(file: TFile): typeof ROOT_MOC_COLORS[number] {
-		// First check if the file already has a colored emoji and return its corresponding color
-		const existingColorMatch = file.basename.match(/^([🔴🟠🟡🟢🔵🟣🟤⚫🔺])\s+/);
-		if (existingColorMatch) {
-			const emoji = existingColorMatch[1];
-			const foundColor = ROOT_MOC_COLORS.find(color => color.emoji === emoji);
+	private getRootMOCColor(file: TFile): { lightColor: string, darkColor: string, name: string } {
+		const cache = this.app.metadataCache.getFileCache(file);
+		
+		// Check for new random color system (hex colors in frontmatter)
+		const storedHexColor = cache?.frontmatter?.['root-moc-color'];
+		const storedLightColor = cache?.frontmatter?.['root-moc-light-color'];
+		const storedDarkColor = cache?.frontmatter?.['root-moc-dark-color'];
+		
+		if (storedHexColor && storedLightColor && storedDarkColor) {
+			return {
+				lightColor: storedLightColor,
+				darkColor: storedDarkColor,
+				name: storedHexColor // Use hex as identifier
+			};
+		}
+		
+		// Legacy compatibility: check for old named colors
+		const storedColorName = cache?.frontmatter?.['root-moc-color'];
+		if (storedColorName && typeof storedColorName === 'string' && !storedColorName.startsWith('#')) {
+			const foundColor = LEGACY_COLORS.find(color => color.name === storedColorName);
 			if (foundColor) {
 				return foundColor;
 			}
 		}
 		
-		// Fallback: Use the MOC name (without emoji and " MOC") for consistent hashing
-		const baseName = file.basename.replace(/^[🔴🟠🟡🟢🔵🟣🟤⚫🔺]\s+/, '').replace(/\s+MOC$/, '');
+		// Backward compatibility: check if the file has one of the old colored emojis
+		const existingColorMatch = file.basename.match(/^([🔴🟠🟡🟢🔵🟣🟤⚫🔺])\s+/);
+		if (existingColorMatch) {
+			const emoji = existingColorMatch[1];
+			const colorName = LEGACY_EMOJI_TO_COLOR[emoji];
+			if (colorName) {
+				const foundColor = LEGACY_COLORS.find(color => color.name === colorName);
+				if (foundColor) {
+					return foundColor;
+				}
+			}
+		}
+		
+		// Final fallback: Use the MOC name for consistent hashing (for very old MOCs)
+		const baseName = file.basename.replace(/^[^\s]+\s+/, '').replace(/\s+MOC$/, '');
 		const hash = this.hashString(baseName);
-		return ROOT_MOC_COLORS[hash % ROOT_MOC_COLORS.length];
+		const legacyColor = LEGACY_COLORS[hash % LEGACY_COLORS.length];
+		return legacyColor;
 	}
 
 	private isRootMOC(file: TFile): boolean {
