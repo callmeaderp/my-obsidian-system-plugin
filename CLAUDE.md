@@ -245,9 +245,35 @@ The plugin has been fully implemented with all requested features plus recent im
 - ✅ **LATEST**: Unlimited random system for root MOCs - truly random emojis and RGB colors with infinite variety
 - ✅ **LATEST**: Dynamic CSS injection system for unlimited color customization
 - ✅ **LATEST**: Multi-layer backward compatibility supporting all previous color systems
+- ✅ **LATEST FIX**: Fixed CSS attribute selector matching issue that was limiting color variety
+- ✅ **LATEST**: Enhanced random color generation with cryptographic randomness and better contrast
+- ✅ **LATEST FIX**: Fixed tab styling persistence issue - root MOC tabs now maintain colors when inactive
+- ✅ **LATEST**: Enhanced event handling and CSS specificity for reliable tab styling across all states
+- ✅ **CRITICAL FIX**: Resolved CSS specificity conflict causing blue color override of random colors in tabs
+- ✅ **LATEST**: Implemented maximum specificity CSS selectors to ensure random colors override all default styling
+- ✅ **FINAL FIX**: Resolved tab file lookup failure preventing random color application
+  - Fixed issue where `getAbstractFileByPath()` failed because aria-label contained display names without extensions
+  - Implemented basename search fallback to properly match tab aria-labels to actual files  
+  - Tab styling system now fully operational for both active and inactive tabs
 
-The plugin has been built and tested successfully with all features implemented and working.
+The plugin has been built and tested successfully with all features implemented and working. The unlimited random color system now provides truly infinite color variety for root MOCs, with persistent styling across all UI elements. **The tab styling system is now fully functional** - random colors display correctly for both active and inactive root MOC tabs, resolving the final issue where colors worked in the sidebar but not in tabs.
 
 ## History
 
-*Initial implementation completed in first session - no previous history*
+### Session 2 - Tab Styling Debug and Fix
+**Issue**: Random colors were working in file explorer sidebar but not applying to tab titles, with tabs appearing blue instead of their assigned random colors.
+
+**Investigation Process**:
+1. Added comprehensive debugging throughout the tab styling system to trace execution
+2. Discovered that file lookup was failing for every tab (`getAbstractFileByPath()` returning null)
+3. Root cause identified: aria-label attributes contained display names like "🚕 testing one! MOC" but `getAbstractFileByPath()` needed full paths with extensions like "🚕 testing one! MOC.md"
+
+**Solution Implemented**:
+- Modified `updateTabStyling()` method (lines 922-930) to implement basename search fallback
+- When exact path lookup fails, now searches through all markdown files to find matches by basename
+- This allows proper file identification and color application to tabs
+
+**Result**: Tab styling system now fully functional with random colors displaying correctly for both active and inactive root MOC tabs.
+
+### Session 1 - Initial Implementation
+*Initial implementation completed with all core features and unlimited random color system*

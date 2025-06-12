@@ -53,6 +53,7 @@ const NOTE_TYPES = {
 
 export default class MOCSystemPlugin extends Plugin {
 	settings: PluginSettings;
+	private tabObserver: MutationObserver | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -129,6 +130,13 @@ export default class MOCSystemPlugin extends Plugin {
 
 		// Add initial styling classes
 		this.updateStylingClasses();
+		
+		// Add initial tab styling
+		console.log('🔍 [EVENT DEBUG] Scheduling initial tab styling');
+		setTimeout(() => {
+			console.log('🔍 [EVENT DEBUG] Running initial tab styling');
+			this.updateTabStyling();
+		}, 200);
 
 		// Add file explorer styling on layout change
 		this.registerEvent(
@@ -137,16 +145,52 @@ export default class MOCSystemPlugin extends Plugin {
 			})
 		);
 
-		// Update tab classes when tabs change
+		// Update tab classes when tabs change - multiple events to catch all tab updates
 		this.registerEvent(
 			this.app.workspace.on('file-open', () => {
+				console.log('🔍 [EVENT DEBUG] file-open event triggered');
 				setTimeout(() => this.updateTabStyling(), 100);
 			})
 		);
+		
+		this.registerEvent(
+			this.app.workspace.on('layout-change', () => {
+				console.log('🔍 [EVENT DEBUG] layout-change event triggered');
+				setTimeout(() => this.updateTabStyling(), 100);
+			})
+		);
+		
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', () => {
+				console.log('🔍 [EVENT DEBUG] active-leaf-change event triggered');
+				setTimeout(() => this.updateTabStyling(), 50);
+			})
+		);
+		
+		// Add mutation observer to catch tab DOM changes that events might miss
+		this.tabObserver = new MutationObserver((mutations) => {
+			console.log('🔍 [EVENT DEBUG] MutationObserver triggered', mutations.length, 'mutations');
+			this.updateTabStyling();
+		});
+		
+		// Observe the workspace container for tab changes
+		const workspaceEl = document.querySelector('.mod-root .workspace');
+		if (workspaceEl) {
+			this.tabObserver.observe(workspaceEl, {
+				childList: true,
+				subtree: true,
+				attributes: true,
+				attributeFilter: ['aria-label']
+			});
+		}
 	}
 
 	onunload() {
-		
+		// Clean up mutation observer
+		if (this.tabObserver) {
+			this.tabObserver.disconnect();
+			this.tabObserver = null;
+		}
 	}
 
 	async loadSettings() {
@@ -851,55 +895,168 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	updateTabStyling() {
+		console.log('🔍 [TAB DEBUG] ===== Starting updateTabStyling =====');
+		
 		// Add classes to tab headers for CSS targeting
 		const tabHeaders = document.querySelectorAll('.workspace-tab-header');
-		tabHeaders.forEach((tab: HTMLElement) => {
+		console.log(`🔍 [TAB DEBUG] Found ${tabHeaders.length} tab headers`);
+		
+		tabHeaders.forEach((tab: HTMLElement, index: number) => {
+			console.log(`🔍 [TAB DEBUG] --- Processing tab ${index + 1} ---`);
+			
 			// Remove existing classes and attributes
+			const beforeClasses = Array.from(tab.classList);
 			tab.classList.remove('smart-note-tab-group', 'smart-note-tab-note', 'smart-note-tab-prompt', 'smart-note-tab-resource', 'smart-note-tab-prompt-hub', 'smart-note-tab-prompt-iteration');
 			tab.removeAttribute('data-smart-note-type');
 			tab.removeAttribute('data-root-moc-color');
 			tab.removeAttribute('data-root-moc-random-color');
+			console.log(`🔍 [TAB DEBUG] Cleaned tab classes. Before: [${beforeClasses.join(', ')}]`);
 			
 			const ariaLabel = tab.getAttribute('aria-label');
+			console.log(`🔍 [TAB DEBUG] Tab aria-label: "${ariaLabel}"`);
+			
 			if (ariaLabel) {
-				const file = this.app.vault.getAbstractFileByPath(ariaLabel);
+				// Find file by basename since aria-label doesn't include .md extension
+				let file: TFile | null = null;
+				
+				// First try exact path match (in case aria-label includes extension)
+				const exactFile = this.app.vault.getAbstractFileByPath(ariaLabel);
+				if (exactFile instanceof TFile) {
+					file = exactFile;
+				} else {
+					// Search for file with matching basename
+					const allFiles = this.app.vault.getMarkdownFiles();
+					file = allFiles.find(f => f.basename === ariaLabel) || null;
+				}
+				
+				console.log(`🔍 [TAB DEBUG] File found: ${file ? `"${file.path}"` : 'null'}`);
+				
 				if (file instanceof TFile) {
 					const displayType = this.getFileDisplayType(file);
+					const isRootMOC = this.isRootMOC(file);
+					console.log(`🔍 [TAB DEBUG] Display type: "${displayType}", Is root MOC: ${isRootMOC}`);
+					
 					if (displayType === 'moc') {
 						tab.classList.add('smart-note-tab-group');
 						tab.setAttribute('data-smart-note-type', 'group');
+						console.log(`🔍 [TAB DEBUG] Added MOC styling classes`);
 						
 						// Add color attribute for root MOCs
-						if (this.isRootMOC(file)) {
+						if (isRootMOC) {
 							const color = this.getRootMOCColor(file);
+							console.log(`🔍 [TAB DEBUG] Root MOC color object:`, {
+								name: color.name,
+								lightColor: color.lightColor,
+								darkColor: color.darkColor
+							});
 							
 							if (color.name.startsWith('#')) {
 								// New random color system
+								console.log(`🔍 [TAB DEBUG] Applying random color system`);
 								tab.setAttribute('data-root-moc-random-color', color.name);
 								tab.style.setProperty('--root-moc-color-light', color.lightColor);
 								tab.style.setProperty('--root-moc-color-dark', color.darkColor);
+								
+								// Verify attributes were set
+								const actualRandomAttr = tab.getAttribute('data-root-moc-random-color');
+								const actualLightProp = tab.style.getPropertyValue('--root-moc-color-light');
+								const actualDarkProp = tab.style.getPropertyValue('--root-moc-color-dark');
+								console.log(`🔍 [TAB DEBUG] Attributes set:`, {
+									'data-root-moc-random-color': actualRandomAttr,
+									'--root-moc-color-light': actualLightProp,
+									'--root-moc-color-dark': actualDarkProp
+								});
+								
+								// Ensure CSS is injected for this color
+								const colorId = color.name.replace('#', '');
+								console.log(`🔍 [TAB DEBUG] Injecting CSS for colorId: ${colorId}`);
+								this.injectRandomColorCSS(colorId, color.lightColor, color.darkColor);
+								
+								// Verify CSS was injected
+								const cssExists = document.getElementById(`random-color-${colorId}`);
+								console.log(`🔍 [TAB DEBUG] CSS injection result: ${cssExists ? 'SUCCESS' : 'FAILED'}`);
+								if (cssExists) {
+									console.log(`🔍 [TAB DEBUG] CSS content preview:`, cssExists.textContent?.substring(0, 200) + '...');
+								}
 							} else {
 								// Legacy named colors
+								console.log(`🔍 [TAB DEBUG] Applying legacy color system: ${color.name}`);
 								tab.setAttribute('data-root-moc-color', color.name);
+								
+								const actualLegacyAttr = tab.getAttribute('data-root-moc-color');
+								console.log(`🔍 [TAB DEBUG] Legacy attribute set: data-root-moc-color="${actualLegacyAttr}"`);
 							}
+						} else {
+							console.log(`🔍 [TAB DEBUG] Sub-MOC detected, no special color handling`);
 						}
+						
+						// Final verification
+						const finalClasses = Array.from(tab.classList);
+						const finalAttributes = {
+							'data-smart-note-type': tab.getAttribute('data-smart-note-type'),
+							'data-root-moc-color': tab.getAttribute('data-root-moc-color'),
+							'data-root-moc-random-color': tab.getAttribute('data-root-moc-random-color')
+						};
+						console.log(`🔍 [TAB DEBUG] Final tab state:`, {
+							classes: finalClasses,
+							attributes: finalAttributes
+						});
+						
 					} else if (displayType !== 'unknown') {
 						tab.classList.add(`smart-note-tab-${displayType}`);
 						tab.setAttribute('data-smart-note-type', displayType);
+						console.log(`🔍 [TAB DEBUG] Added non-MOC styling: smart-note-tab-${displayType}`);
+					} else {
+						console.log(`🔍 [TAB DEBUG] Unknown display type, no styling applied`);
 					}
+				} else {
+					console.log(`🔍 [TAB DEBUG] File is not a TFile instance`);
 				}
+			} else {
+				console.log(`🔍 [TAB DEBUG] No aria-label found on tab`);
 			}
 		});
+		
+		console.log('🔍 [TAB DEBUG] ===== Finished updateTabStyling =====');
+		
+		// Additional debugging: check what CSS rules are currently applied
+		setTimeout(() => {
+			console.log('🔍 [TAB DEBUG] ===== Post-styling CSS verification =====');
+			tabHeaders.forEach((tab: HTMLElement, index: number) => {
+				const ariaLabel = tab.getAttribute('aria-label');
+				if (ariaLabel && ariaLabel.includes('MOC')) {
+					const titleEl = tab.querySelector('.workspace-tab-header-inner-title') as HTMLElement;
+					if (titleEl) {
+						const computedStyle = window.getComputedStyle(titleEl);
+						console.log(`🔍 [TAB DEBUG] Tab ${index + 1} ("${ariaLabel}") computed styles:`, {
+							color: computedStyle.color,
+							fontWeight: computedStyle.fontWeight,
+							backgroundColor: computedStyle.backgroundColor
+						});
+					}
+				}
+			});
+		}, 100);
 	}
 
 	private injectRandomColorCSS(colorId: string, lightColor: string, darkColor: string) {
+		console.log(`🔍 [CSS DEBUG] ===== injectRandomColorCSS called =====`);
+		console.log(`🔍 [CSS DEBUG] Parameters:`, { colorId, lightColor, darkColor });
+		
 		// Check if CSS for this color already exists
 		const existingStyle = document.getElementById(`random-color-${colorId}`);
-		if (existingStyle) return;
+		console.log(`🔍 [CSS DEBUG] Existing style element: ${existingStyle ? 'EXISTS' : 'NOT FOUND'}`);
+		
+		if (existingStyle) {
+			console.log(`🔍 [CSS DEBUG] Style already exists, skipping injection`);
+			return;
+		}
 		
 		// Create CSS for this specific random color
 		const style = document.createElement('style');
 		style.id = `random-color-${colorId}`;
+		console.log(`🔍 [CSS DEBUG] Created style element with ID: ${style.id}`);
+		
 		style.textContent = `
 			/* Random color styling for ${colorId} */
 			body.smart-note-root-moc-random-${colorId} .view-header-title {
@@ -912,42 +1069,95 @@ export default class MOCSystemPlugin extends Plugin {
 			}
 			
 			/* File explorer styling */
-			.nav-file-title[data-root-moc-random-color="${lightColor}"] {
+			.nav-file-title[data-root-moc-random-color="#${colorId}"] {
 				color: var(--root-moc-color-light) !important;
 				font-weight: bold !important;
 			}
 			
-			.theme-dark .nav-file-title[data-root-moc-random-color="${lightColor}"] {
+			.theme-dark .nav-file-title[data-root-moc-random-color="#${colorId}"] {
 				color: var(--root-moc-color-dark) !important;
 			}
 			
-			/* Tab styling */
-			.workspace-tab-header[data-root-moc-random-color="${lightColor}"] .workspace-tab-header-inner-title {
-				color: var(--root-moc-color-light) !important;
+			/* Tab styling - Maximum specificity to override all existing CSS */
+			.app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
+			.app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"].is-active .workspace-tab-header-inner-title,
+			.app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"]:not(.is-active) .workspace-tab-header-inner-title,
+			.mod-root .workspace .workspace-tab-header[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
+			.workspace-tab-header[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title {
+				color: ${lightColor} !important;
+				font-weight: bold !important;
+				--root-moc-color-light: ${lightColor} !important;
+				--root-moc-color-dark: ${darkColor} !important;
+			}
+			
+			.theme-dark .app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
+			.theme-dark .app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"].is-active .workspace-tab-header-inner-title,
+			.theme-dark .app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"]:not(.is-active) .workspace-tab-header-inner-title,
+			.theme-dark .mod-root .workspace .workspace-tab-header[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
+			.theme-dark .workspace-tab-header[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title {
+				color: ${darkColor} !important;
 				font-weight: bold !important;
 			}
 			
-			.theme-dark .workspace-tab-header[data-root-moc-random-color="${lightColor}"] .workspace-tab-header-inner-title {
-				color: var(--root-moc-color-dark) !important;
+			/* Backup approach with even higher specificity using ID-like selectors */
+			body .workspace-tab-header[data-root-moc-random-color="#${colorId}"] .workspace-tab-header-inner-title {
+				color: ${lightColor} !important;
+				font-weight: bold !important;
+			}
+			
+			body.theme-dark .workspace-tab-header[data-root-moc-random-color="#${colorId}"] .workspace-tab-header-inner-title {
+				color: ${darkColor} !important;
+				font-weight: bold !important;
 			}
 		`;
 		
+		console.log(`🔍 [CSS DEBUG] Generated CSS content:`, style.textContent);
+		
 		document.head.appendChild(style);
+		console.log(`🔍 [CSS DEBUG] Style element appended to document head`);
+		
+		// Verify the style was actually added
+		const verifyStyle = document.getElementById(`random-color-${colorId}`);
+		console.log(`🔍 [CSS DEBUG] Verification - Style in DOM: ${verifyStyle ? 'SUCCESS' : 'FAILED'}`);
+		
+		// Check total number of injected styles
+		const allRandomStyles = document.querySelectorAll('style[id^="random-color-"]');
+		console.log(`🔍 [CSS DEBUG] Total random color styles in DOM: ${allRandomStyles.length}`);
+		
+		console.log(`🔍 [CSS DEBUG] ===== injectRandomColorCSS completed =====`);
 	}
 
 	// Helper methods for root MOC color system
 	private generateRandomColor(): { lightColor: string, darkColor: string, hex: string } {
-		// Generate completely random RGB values
-		const r = Math.floor(Math.random() * 256);
-		const g = Math.floor(Math.random() * 256);
-		const b = Math.floor(Math.random() * 256);
+		// Generate completely random RGB values with maximum entropy
+		// Use crypto.getRandomValues for better randomness if available
+		let r, g, b;
+		
+		if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+			const randomBytes = new Uint8Array(3);
+			crypto.getRandomValues(randomBytes);
+			r = randomBytes[0];
+			g = randomBytes[1];
+			b = randomBytes[2];
+		} else {
+			// Fallback to Math.random with better distribution
+			r = Math.floor(Math.random() * 256);
+			g = Math.floor(Math.random() * 256);
+			b = Math.floor(Math.random() * 256);
+		}
+		
+		// Ensure colors are not too dark or too light for better visibility
+		// Adjust to minimum brightness of 64 and maximum of 224 for good contrast
+		r = Math.max(64, Math.min(224, r));
+		g = Math.max(64, Math.min(224, g));
+		b = Math.max(64, Math.min(224, b));
 		
 		const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 		
-		// For dark mode, lighten the color slightly
-		const lightR = Math.min(255, r + 40);
-		const lightG = Math.min(255, g + 40);
-		const lightB = Math.min(255, b + 40);
+		// For dark mode, create a brighter variant
+		const lightR = Math.min(255, r + 50);
+		const lightG = Math.min(255, g + 50);
+		const lightB = Math.min(255, b + 50);
 		const lightHex = `#${lightR.toString(16).padStart(2, '0')}${lightG.toString(16).padStart(2, '0')}${lightB.toString(16).padStart(2, '0')}`;
 		
 		return {
@@ -989,19 +1199,31 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	private getRootMOCColor(file: TFile): { lightColor: string, darkColor: string, name: string } {
+		console.log(`🔍 [COLOR DEBUG] ===== getRootMOCColor called for file: ${file.path} =====`);
+		
 		const cache = this.app.metadataCache.getFileCache(file);
+		console.log(`🔍 [COLOR DEBUG] File cache exists: ${cache ? 'YES' : 'NO'}`);
+		console.log(`🔍 [COLOR DEBUG] Frontmatter:`, cache?.frontmatter);
 		
 		// Check for new random color system (hex colors in frontmatter)
 		const storedHexColor = cache?.frontmatter?.['root-moc-color'];
 		const storedLightColor = cache?.frontmatter?.['root-moc-light-color'];
 		const storedDarkColor = cache?.frontmatter?.['root-moc-dark-color'];
 		
+		console.log(`🔍 [COLOR DEBUG] Stored colors from frontmatter:`, {
+			hex: storedHexColor,
+			light: storedLightColor,
+			dark: storedDarkColor
+		});
+		
 		if (storedHexColor && storedLightColor && storedDarkColor) {
-			return {
+			const result = {
 				lightColor: storedLightColor,
 				darkColor: storedDarkColor,
 				name: storedHexColor // Use hex as identifier
 			};
+			console.log(`🔍 [COLOR DEBUG] Using random color system:`, result);
+			return result;
 		}
 		
 		// Legacy compatibility: check for old named colors
@@ -1030,6 +1252,11 @@ export default class MOCSystemPlugin extends Plugin {
 		const baseName = file.basename.replace(/^[^\s]+\s+/, '').replace(/\s+MOC$/, '');
 		const hash = this.hashString(baseName);
 		const legacyColor = LEGACY_COLORS[hash % LEGACY_COLORS.length];
+		console.log(`🔍 [COLOR DEBUG] Using hash fallback:`, {
+			baseName,
+			hash,
+			selectedColor: legacyColor
+		});
 		return legacyColor;
 	}
 
