@@ -51,6 +51,20 @@ const NOTE_TYPES = {
 	Prompts: { emoji: '🤖', class: 'prompt' }
 } as const;
 
+// Interfaces for vault update system
+interface UpdateResult {
+	file: TFile;
+	changes: string[];
+	success: boolean;
+	error?: string;
+}
+
+interface VaultUpdatePlan {
+	filesToUpdate: TFile[];
+	updateSummary: Map<TFile, string[]>;
+	totalChanges: number;
+}
+
 export default class MOCSystemPlugin extends Plugin {
 	settings: PluginSettings;
 	private tabObserver: MutationObserver | null = null;
@@ -110,6 +124,13 @@ export default class MOCSystemPlugin extends Plugin {
 			id: 'test-random-system',
 			name: 'Test random emoji and color system',
 			callback: () => this.testRandomSystem()
+		});
+
+		// Command to update vault to latest system version
+		this.addCommand({
+			id: 'update-vault-system',
+			name: 'Update vault to latest system',
+			callback: () => this.updateVaultToLatestSystem()
 		});
 
 		// Auto-cleanup on file deletion
@@ -777,6 +798,355 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 	}
 
+	async updateVaultToLatestSystem() {
+		new Notice('Analyzing vault for updates...');
+		
+		try {
+			// Analyze what needs to be updated
+			const updatePlan = await this.analyzeVaultForUpdates();
+			
+			if (updatePlan.totalChanges === 0) {
+				new Notice('Vault is already up to date!');
+				return;
+			}
+			
+			// Show update plan and get confirmation
+			new VaultUpdateModal(this.app, updatePlan, async () => {
+				await this.executeUpdatePlan(updatePlan);
+			}).open();
+			
+		} catch (error) {
+			console.error('Error during vault update analysis:', error);
+			new Notice('Failed to analyze vault for updates - check console');
+		}
+	}
+
+	async analyzeVaultForUpdates(): Promise<VaultUpdatePlan> {
+		// Ensure folder structure exists first
+		await this.ensureFolderStructure();
+		
+		const allFiles = this.app.vault.getMarkdownFiles();
+		const filesToUpdate: TFile[] = [];
+		const updateSummary = new Map<TFile, string[]>();
+		let totalChanges = 0;
+
+		for (const file of allFiles) {
+			const requiredUpdates = await this.detectRequiredUpdates(file);
+			if (requiredUpdates.length > 0) {
+				filesToUpdate.push(file);
+				updateSummary.set(file, requiredUpdates);
+				totalChanges += requiredUpdates.length;
+			}
+		}
+
+		return {
+			filesToUpdate,
+			updateSummary,
+			totalChanges
+		};
+	}
+
+	async detectRequiredUpdates(file: TFile): Promise<string[]> {
+		const updates: string[] = [];
+		const cache = this.app.metadataCache.getFileCache(file);
+		const noteType = cache?.frontmatter?.['note-type'];
+		
+		// Only check plugin-created files and potential plugin files
+		const isPluginFile = noteType && ['moc', 'note', 'resource', 'prompt'].includes(noteType);
+		const couldBePluginFile = this.isMOC(file) || 
+			file.path.startsWith(FOLDERS.Notes) || 
+			file.path.startsWith(FOLDERS.Resources) || 
+			file.path.startsWith(FOLDERS.Prompts) ||
+			file.basename.includes('MOC');
+
+		if (!isPluginFile && !couldBePluginFile) {
+			return updates;
+		}
+
+		// Check frontmatter requirements
+		if (!noteType) {
+			const detectedType = this.detectFileType(file);
+			if (detectedType) {
+				updates.push(`Add missing note-type: ${detectedType}`);
+			}
+		}
+
+		// Check file type specific requirements
+		if (this.isMOC(file)) {
+			if (this.isRootMOC(file)) {
+				updates.push(...await this.checkRootMOCRequirements(file));
+			} else {
+				updates.push(...await this.checkSubMOCRequirements(file));
+			}
+		} else if (file.path.startsWith(FOLDERS.Notes)) {
+			updates.push(...await this.checkNoteRequirements(file));
+		} else if (file.path.startsWith(FOLDERS.Resources)) {
+			updates.push(...await this.checkResourceRequirements(file));
+		} else if (file.path.startsWith(FOLDERS.Prompts)) {
+			updates.push(...await this.checkPromptRequirements(file));
+		}
+
+		return updates;
+	}
+
+	private detectFileType(file: TFile): string | null {
+		if (this.isMOC(file)) return 'moc';
+		if (file.path.startsWith(FOLDERS.Notes)) return 'note';
+		if (file.path.startsWith(FOLDERS.Resources)) return 'resource';
+		if (file.path.startsWith(FOLDERS.Prompts)) return 'prompt';
+		return null;
+	}
+
+	private async checkRootMOCRequirements(file: TFile): Promise<string[]> {
+		const updates: string[] = [];
+		const cache = this.app.metadataCache.getFileCache(file);
+		
+		// Check MOC suffix
+		if (!file.basename.endsWith(' MOC')) {
+			updates.push('Add "MOC" suffix to filename');
+		}
+		
+		// Check random color system
+		const hasRandomColor = cache?.frontmatter?.['root-moc-color'] && 
+			cache?.frontmatter?.['root-moc-light-color'] && 
+			cache?.frontmatter?.['root-moc-dark-color'];
+		
+		if (!hasRandomColor) {
+			updates.push('Add random color system to frontmatter');
+		}
+		
+		// Check emoji prefix
+		const hasEmojiPrefix = /^[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(file.basename);
+		if (!hasEmojiPrefix) {
+			updates.push('Add emoji prefix to filename');
+		}
+
+		return updates;
+	}
+
+	private async checkSubMOCRequirements(file: TFile): Promise<string[]> {
+		const updates: string[] = [];
+		
+		// Check location
+		if (!file.path.startsWith(FOLDERS.MOCs + '/')) {
+			updates.push(`Move to ${FOLDERS.MOCs} folder`);
+		}
+		
+		// Check emoji prefix
+		if (!file.basename.startsWith(NOTE_TYPES.MOCs.emoji)) {
+			updates.push(`Add ${NOTE_TYPES.MOCs.emoji} emoji prefix`);
+		}
+		
+		// Check MOC suffix
+		if (!file.basename.endsWith(' MOC')) {
+			updates.push('Add "MOC" suffix to filename');
+		}
+
+		return updates;
+	}
+
+	private async checkNoteRequirements(file: TFile): Promise<string[]> {
+		const updates: string[] = [];
+		
+		// Check emoji prefix
+		if (!file.basename.startsWith(NOTE_TYPES.Notes.emoji)) {
+			updates.push(`Add ${NOTE_TYPES.Notes.emoji} emoji prefix`);
+		}
+
+		return updates;
+	}
+
+	private async checkResourceRequirements(file: TFile): Promise<string[]> {
+		const updates: string[] = [];
+		
+		// Check emoji prefix
+		if (!file.basename.startsWith(NOTE_TYPES.Resources.emoji)) {
+			updates.push(`Add ${NOTE_TYPES.Resources.emoji} emoji prefix`);
+		}
+
+		return updates;
+	}
+
+	private async checkPromptRequirements(file: TFile): Promise<string[]> {
+		const updates: string[] = [];
+		
+		// Check emoji prefix
+		if (!file.basename.startsWith(NOTE_TYPES.Prompts.emoji)) {
+			updates.push(`Add ${NOTE_TYPES.Prompts.emoji} emoji prefix`);
+		}
+		
+		// Check prompt hub structure
+		if (this.isPromptHub(file)) {
+			const content = await this.app.vault.read(file);
+			if (!content.includes('## Iterations') || !content.includes('```llm-links')) {
+				updates.push('Update prompt hub structure');
+			}
+		}
+
+		return updates;
+	}
+
+	async executeUpdatePlan(plan: VaultUpdatePlan): Promise<UpdateResult[]> {
+		const results: UpdateResult[] = [];
+		let successCount = 0;
+		
+		new Notice(`Updating ${plan.filesToUpdate.length} files...`);
+		
+		for (const file of plan.filesToUpdate) {
+			const updates = plan.updateSummary.get(file) || [];
+			const result = await this.updateFile(file, updates);
+			results.push(result);
+			
+			if (result.success) {
+				successCount++;
+			}
+		}
+		
+		new Notice(`Update complete! Successfully updated ${successCount}/${plan.filesToUpdate.length} files`);
+		return results;
+	}
+
+	async updateFile(file: TFile, updates: string[]): Promise<UpdateResult> {
+		const changes: string[] = [];
+		
+		try {
+			let fileRenamed = false;
+			let newFile = file;
+			
+			for (const update of updates) {
+				if (update.includes('note-type')) {
+					await this.addMissingNoteType(file, update);
+					changes.push(`Added ${update}`);
+				} else if (update.includes('random color system')) {
+					await this.addRandomColorSystem(file);
+					changes.push('Added random color system');
+				} else if (update.includes('emoji prefix') || update.includes('MOC suffix')) {
+					newFile = await this.updateFileName(newFile, update);
+					fileRenamed = true;
+					changes.push(`Updated filename: ${update}`);
+				} else if (update.includes('Move to')) {
+					newFile = await this.moveFileToCorrectLocation(newFile, update);
+					fileRenamed = true;
+					changes.push(`Moved file: ${update}`);
+				} else if (update.includes('prompt hub structure')) {
+					await this.updatePromptHubStructure(newFile);
+					changes.push('Updated prompt hub structure');
+				}
+			}
+			
+			return {
+				file: newFile,
+				changes,
+				success: true
+			};
+		} catch (error) {
+			return {
+				file,
+				changes,
+				success: false,
+				error: error.message
+			};
+		}
+	}
+
+	private async addMissingNoteType(file: TFile, update: string): Promise<void> {
+		const noteType = update.split(': ')[1];
+		const content = await this.app.vault.read(file);
+		
+		if (content.startsWith('---')) {
+			// Has frontmatter, add note-type
+			const lines = content.split('\n');
+			const frontmatterEnd = lines.findIndex((line, index) => index > 0 && line === '---');
+			if (frontmatterEnd !== -1) {
+				lines.splice(frontmatterEnd, 0, `note-type: ${noteType}`);
+				await this.app.vault.modify(file, lines.join('\n'));
+			}
+		} else {
+			// No frontmatter, add it
+			const newContent = `---\nnote-type: ${noteType}\n---\n\n${content}`;
+			await this.app.vault.modify(file, newContent);
+		}
+	}
+
+	private async addRandomColorSystem(file: TFile): Promise<void> {
+		const randomColor = this.generateRandomColor();
+		const content = await this.app.vault.read(file);
+		const lines = content.split('\n');
+		
+		const frontmatterEnd = lines.findIndex((line, index) => index > 0 && line === '---');
+		if (frontmatterEnd !== -1) {
+			lines.splice(frontmatterEnd, 0, 
+				`root-moc-color: ${randomColor.hex}`,
+				`root-moc-light-color: ${randomColor.lightColor}`,
+				`root-moc-dark-color: ${randomColor.darkColor}`
+			);
+			await this.app.vault.modify(file, lines.join('\n'));
+		}
+	}
+
+	private async updateFileName(file: TFile, update: string): Promise<TFile> {
+		let newBasename = file.basename;
+		
+		if (update.includes('emoji prefix')) {
+			const emoji = update.match(/Add (.+) emoji prefix/)?.[1] || '';
+			if (emoji && !newBasename.startsWith(emoji)) {
+				newBasename = `${emoji} ${newBasename}`;
+			} else if (update.includes('Add emoji prefix')) {
+				// For root MOCs, add random emoji
+				const randomEmoji = this.getRandomEmoji();
+				newBasename = `${randomEmoji} ${newBasename}`;
+			}
+		}
+		
+		if (update.includes('MOC suffix') && !newBasename.endsWith(' MOC')) {
+			newBasename = `${newBasename} MOC`;
+		}
+		
+		if (newBasename !== file.basename) {
+			const newPath = file.path.replace(file.basename, newBasename);
+			try {
+				await this.app.vault.rename(file, newPath);
+				return this.app.vault.getAbstractFileByPath(newPath) as TFile;
+			} catch (error) {
+				console.error(`Failed to rename ${file.path} to ${newPath}:`, error);
+				throw error;
+			}
+		}
+		
+		return file;
+	}
+
+	private async moveFileToCorrectLocation(file: TFile, update: string): Promise<TFile> {
+		const targetFolder = update.match(/Move to (.+) folder/)?.[1];
+		if (!targetFolder) return file;
+		
+		const newPath = `${targetFolder}/${file.basename}.md`;
+		try {
+			await this.app.vault.rename(file, newPath);
+			return this.app.vault.getAbstractFileByPath(newPath) as TFile;
+		} catch (error) {
+			console.error(`Failed to move ${file.path} to ${newPath}:`, error);
+			throw error;
+		}
+	}
+
+	private async updatePromptHubStructure(file: TFile): Promise<void> {
+		const content = await this.app.vault.read(file);
+		let newContent = content;
+		
+		if (!content.includes('## Iterations')) {
+			newContent += '\n\n## Iterations\n\n';
+		}
+		
+		if (!content.includes('```llm-links')) {
+			newContent += '\n## LLM Links\n\n```llm-links\n\n```\n';
+		}
+		
+		if (newContent !== content) {
+			await this.app.vault.modify(file, newContent);
+		}
+	}
+
 	isMOC(file: TFile): boolean {
 		const cache = this.app.metadataCache.getFileCache(file);
 		return cache?.frontmatter?.tags?.includes('moc') ?? false;
@@ -1262,6 +1632,91 @@ export default class MOCSystemPlugin extends Plugin {
 
 	private isRootMOC(file: TFile): boolean {
 		return this.isMOC(file) && !file.path.includes('/');
+	}
+}
+
+class VaultUpdateModal extends Modal {
+	constructor(
+		app: App,
+		private updatePlan: VaultUpdatePlan,
+		private onConfirm: () => void
+	) {
+		super(app);
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.createEl('h2', { text: 'Update Vault to Latest System' });
+
+		contentEl.createEl('p', { 
+			text: `Found ${this.updatePlan.totalChanges} updates needed across ${this.updatePlan.filesToUpdate.length} files.`
+		});
+
+		if (this.updatePlan.filesToUpdate.length > 0) {
+			contentEl.createEl('h3', { text: 'Files to be updated:' });
+			
+			const updateList = contentEl.createEl('div');
+			updateList.style.maxHeight = '300px';
+			updateList.style.overflowY = 'auto';
+			updateList.style.border = '1px solid var(--background-modifier-border)';
+			updateList.style.padding = '15px';
+			updateList.style.marginBottom = '20px';
+			updateList.style.backgroundColor = 'var(--background-secondary)';
+
+			for (const file of this.updatePlan.filesToUpdate) {
+				const updates = this.updatePlan.updateSummary.get(file) || [];
+				
+				const fileItem = updateList.createEl('div');
+				fileItem.style.marginBottom = '15px';
+				fileItem.style.paddingBottom = '10px';
+				fileItem.style.borderBottom = '1px solid var(--background-modifier-border-hover)';
+				
+				const fileName = fileItem.createEl('div');
+				fileName.style.fontWeight = 'bold';
+				fileName.style.color = 'var(--text-accent)';
+				fileName.style.marginBottom = '5px';
+				fileName.textContent = file.path;
+				
+				const updatesList = fileItem.createEl('ul');
+				updatesList.style.marginLeft = '15px';
+				updatesList.style.fontSize = '0.9em';
+				
+				for (const update of updates) {
+					const updateItem = updatesList.createEl('li');
+					updateItem.textContent = update;
+					updateItem.style.marginBottom = '2px';
+				}
+			}
+		}
+
+		contentEl.createEl('p', { 
+			text: 'This will modify files to match the latest system requirements. All changes are reversible.',
+			cls: 'mod-warning'
+		});
+
+		const buttonContainer = contentEl.createDiv();
+		buttonContainer.style.display = 'flex';
+		buttonContainer.style.gap = '10px';
+		buttonContainer.style.marginTop = '20px';
+
+		const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
+		cancelButton.addEventListener('click', () => {
+			this.close();
+		});
+
+		const confirmButton = buttonContainer.createEl('button', { 
+			text: `Update ${this.updatePlan.filesToUpdate.length} Files`,
+			cls: 'mod-cta'
+		});
+		confirmButton.addEventListener('click', () => {
+			this.onConfirm();
+			this.close();
+		});
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
 	}
 }
 

@@ -176,7 +176,22 @@ The prompt system is designed for iterative LLM conversations:
 - **Full Backward Compatibility**: Legacy emoji-based and named color systems still supported
 - **Complete Visual Coverage**: Random colors apply to file explorer, tabs, active file indicators, and graph view
 
-### 7. Automatic Features
+### 7. Vault Update System
+**New Feature**: Comprehensive vault modernization tool
+
+- **Intelligent Analysis**: Scans entire vault to detect files needing updates for latest system requirements
+- **Detailed Preview**: Shows exactly what changes will be made to which files before execution
+- **Safe Updates**: Handles file renames, moves, and content modifications with error handling
+- **Comprehensive Coverage**: Updates frontmatter, filenames, file locations, and content structure
+- **Progress Feedback**: Real-time notifications during update process with success/failure reporting
+
+**Update Categories**:
+- Root MOCs: Random color system, emoji prefixes, "MOC" suffix, note-type metadata
+- Sub-MOCs: Folder placement, emoji prefixes, naming conventions
+- Notes/Resources/Prompts: Emoji prefixes, metadata, structural requirements
+- Prompt Hubs: Iterations and LLM Links sections
+
+### 8. Automatic Features
 
 - **Folder Structure**: Creates required folders on plugin load
 - **Section Management**: Intelligently reorganizes MOC content to keep plugin sections at the top
@@ -186,7 +201,7 @@ The prompt system is designed for iterative LLM conversations:
 
 ## Command Reference
 
-The plugin registers 5 commands with Obsidian's command palette:
+The plugin registers 6 commands with Obsidian's command palette:
 
 ### Primary Commands
 
@@ -214,9 +229,14 @@ The plugin registers 5 commands with Obsidian's command palette:
 - **Behavior**: Scans for files with `note-type` metadata, shows list, requires confirmation
 - **Implementation**: `cleanupMOCSystem()` → `CleanupConfirmationModal`
 
+#### 5. Update vault to latest system (`update-vault-system`)
+- **Description**: Updates all vault files to match the latest system requirements
+- **Behavior**: Scans vault, shows update plan with detailed preview, applies changes with confirmation
+- **Implementation**: `updateVaultToLatestSystem()` → `VaultUpdateModal` → `executeUpdatePlan()`
+
 ### Development Commands
 
-#### 5. Test random emoji and color system (`test-random-system`)
+#### 6. Test random emoji and color system (`test-random-system`)
 - **Description**: Development tool for testing unlimited random generation
 - **Behavior**: Generates sample emojis/colors, creates test MOC, logs to console
 - **Implementation**: `testRandomSystem()` with comprehensive logging
@@ -314,6 +334,18 @@ export default class MOCSystemPlugin extends Plugin {
 - `isRootMOC()`: Determines if a MOC is a root-level MOC (not in subfolder)
 - `hashString()`: Legacy method for backward compatibility with old hash-based colors
 
+#### Vault Update System
+- `updateVaultToLatestSystem()`: Main entry point for vault updates, orchestrates analysis and execution
+- `analyzeVaultForUpdates()`: Scans all files and creates comprehensive update plan
+- `detectRequiredUpdates()`: Analyzes individual files to determine what updates are needed
+- `executeUpdatePlan()`: Applies all planned updates with progress tracking and error handling
+- `updateFile()`: Handles individual file updates with safe file operations
+- `addMissingNoteType()`: Adds note-type metadata to frontmatter
+- `addRandomColorSystem()`: Injects random color properties to root MOC frontmatter
+- `updateFileName()`: Safely renames files with emoji prefixes and suffixes
+- `moveFileToCorrectLocation()`: Moves files to appropriate plugin folders
+- `updatePromptHubStructure()`: Adds missing Iterations and LLM Links sections
+
 #### Maintenance
 - `cleanupBrokenLinks()`: Removes references to deleted files and cleans up orphaned blank lines
 - `cleanupOrphanedBlankLines()`: Helper method to remove blank lines left after link deletion in plugin sections
@@ -325,6 +357,20 @@ export default class MOCSystemPlugin extends Plugin {
 - `isMOC()`: Checks for `#moc` tag in frontmatter
 - `isPromptIteration()`: Detects files with version pattern (v1, v2, etc.)
 - `isPromptHub()`: Identifies prompt files that aren't iterations
+
+### Interface Definitions
+
+The plugin includes TypeScript interfaces for the vault update system:
+
+#### UpdateResult Interface (lines 55-60)
+- **Purpose**: Track individual file update results
+- **Properties**: `file`, `changes`, `success`, `error`
+- **Usage**: Return value from `updateFile()` method
+
+#### VaultUpdatePlan Interface (lines 62-66)
+- **Purpose**: Structure for vault-wide update planning
+- **Properties**: `filesToUpdate`, `updateSummary`, `totalChanges`
+- **Usage**: Passed between analysis and execution phases
 
 ### Modal Dialogs
 
@@ -354,6 +400,11 @@ The plugin includes several custom modals extending Obsidian's `Modal` class:
 - **Purpose**: Confirmation dialog for bulk file deletion
 - **Features**: File list display, scrollable container, warning styling
 - **Safety**: Shows exactly which files will be deleted before action
+
+#### 6. VaultUpdateModal (lines 1638-1721)
+- **Purpose**: Preview and confirmation dialog for vault updates
+- **Features**: Detailed file-by-file update preview, scrollable update list, styled file groupings
+- **Safety**: Shows exactly what changes will be made before execution
 
 ### Event Handling System
 
@@ -430,9 +481,37 @@ The plugin has been fully implemented with all requested features plus recent im
 
 The plugin has been built and tested successfully with all features implemented and working. The unlimited random color system now provides truly infinite color variety for root MOCs, with persistent styling across all UI elements. **The tab styling system is now fully functional** - random colors display correctly for both active and inactive root MOC tabs, resolving the final issue where colors worked in the sidebar but not in tabs.
 
+**Latest Addition**: **Vault Update System** - A comprehensive modernization tool that scans the entire vault, analyzes what files need updates for the latest system requirements, shows a detailed preview of planned changes, and safely applies updates with full progress tracking and error handling. This ensures users can seamlessly upgrade their vault as the system evolves.
+
 **Documentation Status**: The CLAUDE.md file has been comprehensively updated with detailed project structure, configuration details, command reference, constants documentation, and enhanced implementation details including line number references for easy navigation.
 
 ## History
+
+### Session 4 - Vault Update System Implementation
+**Purpose**: Develop a comprehensive vault modernization tool to keep all files current with latest system requirements.
+
+**Feature Implemented**:
+- **"Update vault to latest system" Command**: New command available in command palette that scans entire vault for files needing updates
+- **Intelligent Analysis System**: Detects outdated files based on missing metadata, incorrect naming, wrong locations, and structural deficiencies
+- **Detailed Preview Modal**: Shows file-by-file breakdown of planned changes before execution with scrollable update lists
+- **Safe Update Engine**: Handles frontmatter modifications, file renames, folder moves, and content structure updates with comprehensive error handling
+- **Progress Tracking**: Real-time notifications during update process with success/failure reporting
+
+**Technical Implementation**:
+1. **New Interfaces**: `UpdateResult` and `VaultUpdatePlan` for structured update management
+2. **Analysis Methods**: `analyzeVaultForUpdates()`, `detectRequiredUpdates()`, file-type-specific requirement checkers
+3. **Update Handlers**: `updateFile()`, `addMissingNoteType()`, `addRandomColorSystem()`, `updateFileName()`, `moveFileToCorrectLocation()`
+4. **New Modal**: `VaultUpdateModal` with styled preview interface and confirmation workflow
+5. **Comprehensive Coverage**: Handles all file types (root MOCs, sub-MOCs, notes, resources, prompts) with type-specific requirements
+
+**User Benefits**:
+- One-command vault modernization for system updates
+- Safe preview-before-execute workflow prevents unwanted changes
+- Maintains backward compatibility while upgrading to latest features
+- Handles complex file operations (renames, moves) automatically
+- Comprehensive progress feedback and error reporting
+
+**Result**: Users can now seamlessly upgrade their entire vault whenever the system evolves, ensuring all files remain current with the latest plugin requirements and features.
 
 ### Session 3 - Comprehensive Documentation Enhancement
 **Purpose**: Complete overhaul and enhancement of the CLAUDE.md documentation file to provide comprehensive project understanding.
