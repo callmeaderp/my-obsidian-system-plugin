@@ -13,6 +13,33 @@ The primary goal of this plugin is to automate the user's MOC-based system for o
 3. **Efficient prompt management** - Specialized system for managing LLM prompts with versioning and multi-chat link support
 4. **Automated maintenance** - Auto-cleanup of broken links and automatic folder structure creation
 
+## Project Structure
+
+### File Overview
+
+The plugin consists of the following key files:
+
+#### Core Plugin Files
+- **`main.ts`** (1,516 lines) - Main plugin implementation containing all logic, modal classes, and functionality
+- **`main.js`** - Compiled JavaScript output from TypeScript build process
+- **`styles.css`** - CSS styling rules for note type visual differentiation and color theming
+
+#### Configuration Files
+- **`manifest.json`** - Obsidian plugin manifest with metadata, version, and compatibility info
+- **`package.json`** - Node.js project configuration with dependencies and build scripts
+- **`tsconfig.json`** - TypeScript compiler configuration
+- **`esbuild.config.mjs`** - Build system configuration for bundling and compilation
+
+#### Development Files
+- **`version-bump.mjs`** - Script for automated version bumping during releases
+- **`versions.json`** - Version history tracking for plugin releases
+- **`node_modules/`** - Development dependencies (TypeScript, esbuild, Obsidian API)
+
+#### Documentation
+- **`CLAUDE.md`** - Comprehensive project documentation (this file)
+- **`README.md`** - Basic plugin description for users
+- **`LICENSE`** - MIT license file
+
 ## System Design
 
 ### File Organization Structure
@@ -24,6 +51,33 @@ The primary goal of this plugin is to automate the user's MOC-based system for o
 - **Prompts**: Stored in `Prompts/` folder with 🤖 emoji prefix (includes both hubs and iterations)
 
 All files include frontmatter with `note-type` metadata for CSS targeting and backwards compatibility.
+
+### Plugin Configuration
+
+#### Manifest Settings (`manifest.json`)
+```json
+{
+  "id": "moc-system-plugin",
+  "name": "MOC System Plugin", 
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Automated MOC-based note management system",
+  "author": "Your Name",
+  "isDesktopOnly": false
+}
+```
+
+#### Development Dependencies (`package.json`)
+- **TypeScript 4.7.4** - Core language with type safety
+- **esbuild 0.17.3** - Fast bundling and compilation
+- **Obsidian API (latest)** - Plugin development framework
+- **ESLint & TypeScript ESLint** - Code quality and consistency
+- **Node.js types** - TypeScript definitions for Node.js
+
+#### Build Scripts
+- `npm run dev` - Development build with watch mode
+- `npm run build` - Production build with type checking
+- `npm run version` - Automated version bumping for releases
 
 ### MOC Structure
 
@@ -130,6 +184,81 @@ The prompt system is designed for iterative LLM conversations:
 - **Link Cleanup**: Removes broken links when files are deleted
 - **Dynamic Styling**: Updates CSS classes based on active file and file types
 
+## Command Reference
+
+The plugin registers 5 commands with Obsidian's command palette:
+
+### Primary Commands
+
+#### 1. Create MOC or add content (`moc-context-create`)
+- **Description**: Context-aware creation command that adapts based on current file
+- **Behavior**: 
+  - Outside MOC: Opens modal to create new root-level MOC
+  - Inside MOC: Opens modal with options to add sub-MOC, note, resource, or prompt
+- **Implementation**: `handleContextCreate()` → `CreateMOCModal` or `AddToMOCModal`
+
+#### 2. Duplicate prompt iteration (`duplicate-prompt-iteration`)
+- **Description**: Creates copy of current prompt iteration with incremented version
+- **Availability**: Only enabled when viewing a prompt iteration file (contains `v1`, `v2`, etc.)
+- **Behavior**: Analyzes filename, finds next version number, prompts for description
+- **Implementation**: `duplicatePromptIteration()` → `PromptDescriptionModal`
+
+#### 3. Open all LLM links (`open-llm-links`)
+- **Description**: Opens all URLs in the `llm-links` code block in browser tabs
+- **Availability**: Only enabled when viewing a prompt hub file
+- **Behavior**: Parses code block, validates URLs, opens in new tabs
+- **Implementation**: `openLLMLinks()` with regex parsing
+
+#### 4. Cleanup MOC system files (`cleanup-moc-system`)
+- **Description**: Safely removes all plugin-created files with confirmation
+- **Behavior**: Scans for files with `note-type` metadata, shows list, requires confirmation
+- **Implementation**: `cleanupMOCSystem()` → `CleanupConfirmationModal`
+
+### Development Commands
+
+#### 5. Test random emoji and color system (`test-random-system`)
+- **Description**: Development tool for testing unlimited random generation
+- **Behavior**: Generates sample emojis/colors, creates test MOC, logs to console
+- **Implementation**: `testRandomSystem()` with comprehensive logging
+
+## Configuration Constants
+
+### Core Constants
+```typescript
+const FOLDERS = {
+  MOCs: 'MOCs',
+  Notes: 'Notes', 
+  Resources: 'Resources',
+  Prompts: 'Prompts'
+} as const;
+
+const SECTION_ORDER = ['MOCs', 'Notes', 'Resources', 'Prompts'] as const;
+
+const NOTE_TYPES = {
+  MOCs: { emoji: '🔵', class: 'moc' },
+  Notes: { emoji: '📝', class: 'note' },
+  Resources: { emoji: '📁', class: 'resource' },
+  Prompts: { emoji: '🤖', class: 'prompt' }
+} as const;
+```
+
+### Legacy Color System
+- **`LEGACY_EMOJI_TO_COLOR`** - Maps colored circle emojis to color names
+- **`LEGACY_COLORS`** - Array of predefined colors with light/dark variants
+- Used for backward compatibility with older MOC files
+
+### Unicode Emoji Ranges
+```typescript
+const emojiRanges = [
+  [0x1F600, 0x1F64F], // Emoticons
+  [0x1F300, 0x1F5FF], // Misc Symbols and Pictographs
+  [0x1F680, 0x1F6FF], // Transport and Map Symbols
+  [0x1F900, 0x1F9FF], // Supplemental Symbols and Pictographs
+  [0x2600, 0x26FF],   // Miscellaneous Symbols
+  [0x2700, 0x27BF]    // Dingbats
+];
+```
+
 ## Implementation Details
 
 ### Core Architecture
@@ -199,19 +328,62 @@ export default class MOCSystemPlugin extends Plugin {
 
 ### Modal Dialogs
 
-The plugin includes several custom modals for user input:
+The plugin includes several custom modals extending Obsidian's `Modal` class:
 
-1. **CreateMOCModal**: For creating new top-level MOCs
-2. **AddToMOCModal**: Shows options when adding content to existing MOC
-3. **CreateItemModal**: Generic input for creating notes/resources/etc.
-4. **PromptDescriptionModal**: Optional description when duplicating prompts
-5. **CleanupConfirmationModal**: Confirmation dialog for system cleanup with file list
+#### 1. CreateMOCModal (lines 1268-1304)
+- **Purpose**: Create new top-level MOCs
+- **Features**: Text input with validation, Enter key support, auto-focus
+- **Triggers**: Used when `handleContextCreate()` detects user is outside a MOC
 
-### Event Handling
+#### 2. AddToMOCModal (lines 1306-1361) 
+- **Purpose**: Shows creation options when inside a MOC
+- **Features**: Four buttons for different content types (Sub-MOC, Note, Resource, Prompt)
+- **Chaining**: Each button opens a `CreateItemModal` for name input
 
-- Registers file deletion event to trigger automatic link cleanup
-- Uses command callbacks to check active file context
-- Implements keyboard shortcuts (Enter key) in all modals
+#### 3. CreateItemModal (lines 1363-1403)
+- **Purpose**: Generic text input for item creation
+- **Features**: Dynamic title based on item type, validation, keyboard shortcuts
+- **Usage**: Called from `AddToMOCModal` with appropriate callbacks
+
+#### 4. PromptDescriptionModal (lines 1405-1454)
+- **Purpose**: Optional description input when duplicating prompt iterations
+- **Features**: Skip option, flexible input (description optional), dual buttons
+- **Special**: Allows empty input for version-only duplicates
+
+#### 5. CleanupConfirmationModal (lines 1456-1516)
+- **Purpose**: Confirmation dialog for bulk file deletion
+- **Features**: File list display, scrollable container, warning styling
+- **Safety**: Shows exactly which files will be deleted before action
+
+### Event Handling System
+
+The plugin implements comprehensive event handling for real-time UI updates:
+
+#### File System Events
+- **`vault.on('delete')`** (line 117): Auto-cleanup broken links when files are deleted
+- **Callback**: `cleanupBrokenLinks()` removes references and orphaned blank lines
+
+#### Workspace Events  
+- **`workspace.on('active-leaf-change')`** (line 126): Updates body classes when switching files
+- **`workspace.on('file-open')`** (line 150): Triggers tab styling updates
+- **`workspace.on('layout-change')`** (line 143): Updates file explorer and tab styling
+- **Timing**: All styling updates use `setTimeout()` to ensure DOM is ready
+
+#### MutationObserver for Tab Styling (lines 171-185)
+- **Purpose**: Catches tab DOM changes that workspace events might miss
+- **Target**: `.mod-root .workspace` container
+- **Options**: Monitors `childList`, `subtree`, `attributes`, and `aria-label` changes
+- **Cleanup**: Properly disconnected in `onunload()` to prevent memory leaks
+
+#### Modal Keyboard Handling
+- **Enter Key**: All modals support Enter key for quick submission
+- **Auto-focus**: Input fields automatically receive focus when modals open
+- **Validation**: Prevents submission with empty required fields
+
+#### Command Context Checking
+- **`checkCallback`**: Used for conditional command availability
+- **Context-aware**: Commands only appear when applicable (e.g., prompt commands only in prompt files)
+- **Real-time**: Availability updates as user navigates between files
 
 ## Technical Decisions
 
@@ -258,7 +430,28 @@ The plugin has been fully implemented with all requested features plus recent im
 
 The plugin has been built and tested successfully with all features implemented and working. The unlimited random color system now provides truly infinite color variety for root MOCs, with persistent styling across all UI elements. **The tab styling system is now fully functional** - random colors display correctly for both active and inactive root MOC tabs, resolving the final issue where colors worked in the sidebar but not in tabs.
 
+**Documentation Status**: The CLAUDE.md file has been comprehensively updated with detailed project structure, configuration details, command reference, constants documentation, and enhanced implementation details including line number references for easy navigation.
+
 ## History
+
+### Session 3 - Comprehensive Documentation Enhancement
+**Purpose**: Complete overhaul and enhancement of the CLAUDE.md documentation file to provide comprehensive project understanding.
+
+**Major Additions**:
+1. **Project Structure Section**: Detailed file-by-file breakdown of all 12 project files with descriptions
+2. **Plugin Configuration Section**: Complete manifest.json and package.json documentation with build scripts
+3. **Command Reference Section**: Detailed documentation of all 5 commands with IDs, behaviors, and implementations
+4. **Configuration Constants Section**: TypeScript code examples of core constants, legacy color system, and Unicode ranges
+5. **Enhanced Implementation Details**: Line number references, expanded modal documentation, comprehensive event handling system
+
+**Improvements**:
+- Added line number references throughout for easy code navigation
+- Documented all modal classes with purposes, features, and usage patterns
+- Comprehensive event handling documentation including MutationObserver details
+- Configuration constants with actual TypeScript code examples
+- Build system and development workflow documentation
+
+**Result**: The CLAUDE.md file now serves as a complete technical reference for the plugin, making it easy for any developer to understand the entire codebase structure, features, and implementation details.
 
 ### Session 2 - Tab Styling Debug and Fix
 **Issue**: Random colors were working in file explorer sidebar but not applying to tab titles, with tabs appearing blue instead of their assigned random colors.
