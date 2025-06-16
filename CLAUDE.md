@@ -706,5 +706,9 @@ The plugin has been built and tested successfully with all features implemented 
 - Adding vault event listeners for file create/rename to trigger file explorer styling updates
 - Ensuring CSS rules are generated for all hash-based colors used in file explorer
 
+**Final Critical Fixes**: Two major issues resolved after debugging with user:
+1. **Hash-based color collision**: Modified `generateHashBasedColor()` to use golden ratio multiplier and bit mixing for better color distribution, preventing identical colors for similar file names
+2. **File explorer CSS injection bug**: Fixed CSS to use direct color values instead of CSS custom properties (`var(--root-moc-color-light)`) which weren't working correctly
+
 ### Session 1 - Initial Implementation
 *Initial implementation completed with all core features and unlimited random color system*

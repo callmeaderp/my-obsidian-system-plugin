@@ -126,6 +126,7 @@ export default class MOCSystemPlugin extends Plugin {
 			callback: () => this.testRandomSystem()
 		});
 
+
 		// Command to update vault to latest system version
 		this.addCommand({
 			id: 'update-vault-system',
@@ -1455,6 +1456,7 @@ export default class MOCSystemPlugin extends Plugin {
 	updateFileExplorerStyling() {
 		// Add data attributes to file explorer items for CSS targeting
 		const fileItems = document.querySelectorAll('.nav-file-title');
+		
 		fileItems.forEach((item: HTMLElement) => {
 			// Remove existing attributes
 			item.removeAttribute('data-root-moc-color');
@@ -1475,8 +1477,6 @@ export default class MOCSystemPlugin extends Plugin {
 							if (color.name.startsWith('#')) {
 								// New random color system
 								item.setAttribute('data-root-moc-random-color', color.name);
-								item.style.setProperty('--root-moc-color-light', color.lightColor);
-								item.style.setProperty('--root-moc-color-dark', color.darkColor);
 								
 								// Inject CSS for this color if not already present
 								const colorId = color.name.replace('#', '');
@@ -1670,12 +1670,12 @@ export default class MOCSystemPlugin extends Plugin {
 			
 			/* File explorer styling */
 			.nav-file-title[data-root-moc-random-color="#${colorId}"] {
-				color: var(--root-moc-color-light) !important;
+				color: ${lightColor} !important;
 				font-weight: bold !important;
 			}
 			
 			.theme-dark .nav-file-title[data-root-moc-random-color="#${colorId}"] {
-				color: var(--root-moc-color-dark) !important;
+				color: ${darkColor} !important;
 			}
 			
 			/* Tab styling - Maximum specificity to override all existing CSS */
@@ -1875,11 +1875,16 @@ export default class MOCSystemPlugin extends Plugin {
 
 
 	private generateHashBasedColor(hash: number): { lightColor: string, darkColor: string, name: string } {
-		// Use hash to generate consistent but unlimited RGB values
-		// Ensure good color distribution across the spectrum
-		const r = Math.max(64, Math.min(224, (hash & 0xFF0000) >> 16));
-		const g = Math.max(64, Math.min(224, (hash & 0x00FF00) >> 8));
-		const b = Math.max(64, Math.min(224, hash & 0x0000FF));
+		// Better hash-based color generation with improved distribution
+		// Use multiple hash transformations to spread colors across spectrum
+		let h1 = hash;
+		let h2 = hash * 0x9e3779b9; // Golden ratio multiplier for better distribution
+		let h3 = hash ^ (hash >>> 16); // XOR with shifted bits
+		
+		// Extract RGB components with better mixing
+		const r = Math.max(64, Math.min(224, ((h1 >>> 0) & 0xFF)));
+		const g = Math.max(64, Math.min(224, ((h2 >>> 8) & 0xFF)));  
+		const b = Math.max(64, Math.min(224, ((h3 >>> 16) & 0xFF)));
 		
 		const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 		
