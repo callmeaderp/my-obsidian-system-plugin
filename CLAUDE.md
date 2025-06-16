@@ -701,5 +701,10 @@ The plugin has been built and tested successfully with all features implemented 
 - Ensuring stable, non-changing colors for each MOC while maintaining unlimited variety
 - Preserving legacy 9-color system for sub-MOCs only
 
+**Additional Fix**: File explorer sidebar showing all MOCs as blue instead of unique colors due to missing CSS injection. Fixed by:
+- Adding `injectRandomColorCSS()` call to `updateFileExplorerStyling()` method
+- Adding vault event listeners for file create/rename to trigger file explorer styling updates
+- Ensuring CSS rules are generated for all hash-based colors used in file explorer
+
 ### Session 1 - Initial Implementation
 *Initial implementation completed with all core features and unlimited random color system*

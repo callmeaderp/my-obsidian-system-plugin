@@ -175,10 +175,23 @@ export default class MOCSystemPlugin extends Plugin {
 			this.updateTabStyling();
 		}, 200);
 
-		// Add file explorer styling on layout change
+		// Add file explorer styling on layout change and file changes
 		this.registerEvent(
 			this.app.workspace.on('layout-change', () => {
 				this.updateFileExplorerStyling();
+			})
+		);
+		
+		// Update file explorer when files are created/renamed/moved
+		this.registerEvent(
+			this.app.vault.on('create', () => {
+				setTimeout(() => this.updateFileExplorerStyling(), 100);
+			})
+		);
+		
+		this.registerEvent(
+			this.app.vault.on('rename', () => {
+				setTimeout(() => this.updateFileExplorerStyling(), 100);
 			})
 		);
 
@@ -1464,6 +1477,10 @@ export default class MOCSystemPlugin extends Plugin {
 								item.setAttribute('data-root-moc-random-color', color.name);
 								item.style.setProperty('--root-moc-color-light', color.lightColor);
 								item.style.setProperty('--root-moc-color-dark', color.darkColor);
+								
+								// Inject CSS for this color if not already present
+								const colorId = color.name.replace('#', '');
+								this.injectRandomColorCSS(colorId, color.lightColor, color.darkColor);
 							} else {
 								// Legacy named colors
 								item.setAttribute('data-root-moc-color', color.name);
