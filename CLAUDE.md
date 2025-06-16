@@ -695,5 +695,11 @@ The plugin has been built and tested successfully with all features implemented 
 
 **Result**: The unlimited random color system now works as originally intended, providing truly unlimited color variety for root MOCs with automatic fallback generation for any MOCs missing color properties.
 
+**Critical Bug Fix**: Initial implementation caused race conditions and color swapping due to async file modifications in `getRootMOCColor()`. Fixed by:
+- Removing async file modifications from color getter function
+- Implementing hash-based consistent color generation for unlimited color range
+- Ensuring stable, non-changing colors for each MOC while maintaining unlimited variety
+- Preserving legacy 9-color system for sub-MOCs only
+
 ### Session 1 - Initial Implementation
 *Initial implementation completed with all core features and unlimited random color system*

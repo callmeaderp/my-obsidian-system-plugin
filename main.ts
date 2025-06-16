@@ -1831,26 +1831,24 @@ export default class MOCSystemPlugin extends Plugin {
 			}
 		}
 		
-		// For root MOCs without stored colors, generate new random colors instead of using legacy fallback
-		if (this.isRootMOC(file)) {
-			console.log(`🔍 [COLOR DEBUG] Root MOC missing random colors - generating new ones for: ${file.path}`);
-			const newRandomColor = this.generateRandomColor();
-			
-			// Store the new random colors in frontmatter for future use
-			this.updateFileWithRandomColors(file, newRandomColor);
-			
-			return {
-				lightColor: newRandomColor.lightColor,
-				darkColor: newRandomColor.darkColor,
-				name: newRandomColor.hex
-			};
-		}
-		
-		// Final fallback: Use legacy hash system only for truly legacy MOCs (sub-MOCs or very old files)
+		// Final fallback: Use hash-based system for consistent colors
 		const baseName = file.basename.replace(/^[^\s]+\s+/, '').replace(/\s+MOC$/, '');
 		const hash = this.hashString(baseName);
+		
+		// For root MOCs, use unlimited hash-based colors instead of limited legacy set
+		if (this.isRootMOC(file)) {
+			const unlimitedColor = this.generateHashBasedColor(hash);
+			console.log(`🔍 [COLOR DEBUG] Using unlimited hash-based color for root MOC:`, {
+				baseName,
+				hash,
+				selectedColor: unlimitedColor
+			});
+			return unlimitedColor;
+		}
+		
+		// For sub-MOCs and other legacy files, use the original 9-color system
 		const legacyColor = LEGACY_COLORS[hash % LEGACY_COLORS.length];
-		console.log(`🔍 [COLOR DEBUG] Using hash fallback for legacy MOC:`, {
+		console.log(`🔍 [COLOR DEBUG] Using legacy hash fallback:`, {
 			baseName,
 			hash,
 			selectedColor: legacyColor
@@ -1858,32 +1856,27 @@ export default class MOCSystemPlugin extends Plugin {
 		return legacyColor;
 	}
 
-	private async updateFileWithRandomColors(file: TFile, randomColor: { lightColor: string, darkColor: string, hex: string }): Promise<void> {
-		try {
-			const content = await this.app.vault.read(file);
-			const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
-			
-			if (frontmatterMatch) {
-				let frontmatter = frontmatterMatch[1];
-				// Add random color properties if they don't exist
-				if (!frontmatter.includes('root-moc-color:')) {
-					frontmatter += `\nroot-moc-color: ${randomColor.hex}`;
-				}
-				if (!frontmatter.includes('root-moc-light-color:')) {
-					frontmatter += `\nroot-moc-light-color: ${randomColor.lightColor}`;
-				}
-				if (!frontmatter.includes('root-moc-dark-color:')) {
-					frontmatter += `\nroot-moc-dark-color: ${randomColor.darkColor}`;
-				}
-				
-				const newContent = content.replace(frontmatterMatch[0], `---\n${frontmatter}\n---`);
-				await this.app.vault.modify(file, newContent);
-				
-				console.log(`🔍 [COLOR DEBUG] Added random colors to frontmatter for: ${file.path}`);
-			}
-		} catch (error) {
-			console.error(`Failed to update random colors for ${file.path}:`, error);
-		}
+
+	private generateHashBasedColor(hash: number): { lightColor: string, darkColor: string, name: string } {
+		// Use hash to generate consistent but unlimited RGB values
+		// Ensure good color distribution across the spectrum
+		const r = Math.max(64, Math.min(224, (hash & 0xFF0000) >> 16));
+		const g = Math.max(64, Math.min(224, (hash & 0x00FF00) >> 8));
+		const b = Math.max(64, Math.min(224, hash & 0x0000FF));
+		
+		const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+		
+		// For dark mode, create a brighter variant
+		const lightR = Math.min(255, r + 50);
+		const lightG = Math.min(255, g + 50);
+		const lightB = Math.min(255, b + 50);
+		const lightHex = `#${lightR.toString(16).padStart(2, '0')}${lightG.toString(16).padStart(2, '0')}${lightB.toString(16).padStart(2, '0')}`;
+		
+		return {
+			lightColor: hex,
+			darkColor: lightHex,
+			name: hex
+		};
 	}
 
 	isRootMOC(file: TFile): boolean {
