@@ -126,6 +126,13 @@ export default class MOCSystemPlugin extends Plugin {
 			callback: () => this.testRandomSystem()
 		});
 
+		// Debug command for file explorer styling (development only)
+		this.addCommand({
+			id: 'debug-file-explorer',
+			name: 'Debug file explorer styling',
+			callback: () => this.debugFileExplorerStyling()
+		});
+
 
 		// Command to update vault to latest system version
 		this.addCommand({
@@ -728,6 +735,82 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 		
 		return result;
+	}
+
+	debugFileExplorerStyling() {
+		console.log('🔍 [FILE EXPLORER DEBUG] ===== Starting file explorer debug =====');
+		
+		// Find all MOC files
+		const allMOCs = this.app.vault.getMarkdownFiles().filter(f => this.isMOC(f));
+		console.log(`🔍 [FILE EXPLORER DEBUG] Found ${allMOCs.length} MOC files:`, allMOCs.map(f => f.basename));
+		
+		// Check what file explorer items exist
+		const fileItems = document.querySelectorAll('.nav-file-title');
+		console.log(`🔍 [FILE EXPLORER DEBUG] Found ${fileItems.length} file explorer items`);
+		
+		// Check each MOC file's styling
+		allMOCs.forEach((file, index) => {
+			console.log(`🔍 [FILE EXPLORER DEBUG] --- Checking MOC ${index + 1}: "${file.basename}" ---`);
+			
+			const isRootMOC = this.isRootMOC(file);
+			console.log(`🔍 [FILE EXPLORER DEBUG] Is root MOC: ${isRootMOC}`);
+			
+			if (isRootMOC) {
+				const color = this.getRootMOCColor(file);
+				console.log(`🔍 [FILE EXPLORER DEBUG] Root MOC color:`, color);
+				
+				// Find the corresponding DOM element
+				const correspondingItem = Array.from(fileItems).find(item => 
+					item.getAttribute('data-path') === file.path
+				);
+				
+				if (correspondingItem) {
+					console.log(`🔍 [FILE EXPLORER DEBUG] Found DOM element for ${file.basename}`);
+					const attributes = {
+						'data-path': correspondingItem.getAttribute('data-path'),
+						'data-smart-note-type': correspondingItem.getAttribute('data-smart-note-type'),
+						'data-root-moc-color': correspondingItem.getAttribute('data-root-moc-color'),
+						'data-root-moc-random-color': correspondingItem.getAttribute('data-root-moc-random-color')
+					};
+					console.log(`🔍 [FILE EXPLORER DEBUG] DOM attributes:`, attributes);
+					
+					// Check computed styles
+					const computedStyle = window.getComputedStyle(correspondingItem);
+					console.log(`🔍 [FILE EXPLORER DEBUG] Computed styles:`, {
+						color: computedStyle.color,
+						fontWeight: computedStyle.fontWeight,
+						backgroundColor: computedStyle.backgroundColor
+					});
+					
+					// Check for CSS rules that might apply
+					if (color.name.startsWith('#')) {
+						const colorId = color.name.replace('#', '');
+						const expectedCSSId = `random-color-${colorId}`;
+						const cssRule = document.getElementById(expectedCSSId);
+						console.log(`🔍 [FILE EXPLORER DEBUG] Expected CSS rule ID: ${expectedCSSId}`);
+						console.log(`🔍 [FILE EXPLORER DEBUG] CSS rule exists: ${cssRule ? 'YES' : 'NO'}`);
+						if (cssRule) {
+							console.log(`🔍 [FILE EXPLORER DEBUG] CSS rule content:`, cssRule.textContent?.substring(0, 200) + '...');
+						}
+					}
+				} else {
+					console.log(`🔍 [FILE EXPLORER DEBUG] ❌ No DOM element found for ${file.basename}`);
+					console.log(`🔍 [FILE EXPLORER DEBUG] Expected path: ${file.path}`);
+					console.log(`🔍 [FILE EXPLORER DEBUG] Available paths:`, Array.from(fileItems).map(item => item.getAttribute('data-path')));
+				}
+			}
+		});
+		
+		// Count total injected CSS rules
+		const allRandomStyles = document.querySelectorAll('style[id^="random-color-"]');
+		console.log(`🔍 [FILE EXPLORER DEBUG] Total injected random color CSS rules: ${allRandomStyles.length}`);
+		
+		// Manually trigger file explorer styling update and see what happens
+		console.log(`🔍 [FILE EXPLORER DEBUG] Manually triggering file explorer styling update...`);
+		this.updateFileExplorerStyling();
+		
+		console.log('🔍 [FILE EXPLORER DEBUG] ===== Completed file explorer debug =====');
+		new Notice('File explorer debug completed - check console for details');
 	}
 
 	async testRandomSystem() {
