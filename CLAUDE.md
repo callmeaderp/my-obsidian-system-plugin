@@ -666,5 +666,34 @@ The plugin has been built and tested successfully with all features implemented 
 
 **Result**: The reorganize MOC command now works reliably with proper frontmatter formatting and complete link preservation across all vault files.
 
+### Session 7 - Random Color System Fix  
+**Purpose**: Fix critical bug where root MOCs were being limited to only 9 legacy colors instead of truly unlimited random colors.
+
+**Issue Identified**: User correctly suspected that new MOCs weren't getting truly random colors. Investigation revealed that the `getRootMOCColor()` function had a fallback mechanism that limited colors to just 9 legacy options (red, orange, yellow, green, blue, purple, brown, gray, rose) when random color properties were missing or frontmatter cache wasn't ready.
+
+**Root Cause**: 
+- The fallback mechanism used `LEGACY_COLORS[hash % LEGACY_COLORS.length]` (line 1837)
+- This restricted color selection to only 9 predefined colors instead of 16.7 million possible RGB combinations
+- Legacy code from earlier versions was interfering with the unlimited random system
+
+**Technical Fix Implemented**:
+1. **Modified `getRootMOCColor()`** (lines 1834-1858): Changed fallback behavior to generate new random colors for root MOCs instead of using legacy color limitation
+2. **Added `updateFileWithRandomColors()`** (lines 1861-1887): New method to automatically store missing random color properties in frontmatter
+3. **Preserved backward compatibility**: Legacy fallback now only applies to truly old MOCs that should use the limited color system
+
+**Code Changes**:
+- **Line 1834-1847**: Added root MOC check that generates new random colors instead of falling back to legacy system
+- **Line 1840**: Calls new `updateFileWithRandomColors()` method to persist colors to frontmatter
+- **Line 1849-1858**: Restricted legacy fallback to only apply to non-root MOCs
+- **Lines 1861-1887**: New helper method to safely update frontmatter with random color properties
+
+**User Benefits**:
+- ✅ **Truly unlimited colors**: Root MOCs now access full RGB spectrum (16.7 million colors)
+- ✅ **Self-healing system**: Existing MOCs missing random colors automatically get new ones
+- ✅ **No more 9-color limitation**: Complete removal of legacy color restriction for new MOCs
+- ✅ **Automatic persistence**: Random colors are automatically saved to frontmatter for consistency
+
+**Result**: The unlimited random color system now works as originally intended, providing truly unlimited color variety for root MOCs with automatic fallback generation for any MOCs missing color properties.
+
 ### Session 1 - Initial Implementation
 *Initial implementation completed with all core features and unlimited random color system*

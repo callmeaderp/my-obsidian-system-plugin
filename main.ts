@@ -1831,16 +1831,59 @@ export default class MOCSystemPlugin extends Plugin {
 			}
 		}
 		
-		// Final fallback: Use the MOC name for consistent hashing (for very old MOCs)
+		// For root MOCs without stored colors, generate new random colors instead of using legacy fallback
+		if (this.isRootMOC(file)) {
+			console.log(`🔍 [COLOR DEBUG] Root MOC missing random colors - generating new ones for: ${file.path}`);
+			const newRandomColor = this.generateRandomColor();
+			
+			// Store the new random colors in frontmatter for future use
+			this.updateFileWithRandomColors(file, newRandomColor);
+			
+			return {
+				lightColor: newRandomColor.lightColor,
+				darkColor: newRandomColor.darkColor,
+				name: newRandomColor.hex
+			};
+		}
+		
+		// Final fallback: Use legacy hash system only for truly legacy MOCs (sub-MOCs or very old files)
 		const baseName = file.basename.replace(/^[^\s]+\s+/, '').replace(/\s+MOC$/, '');
 		const hash = this.hashString(baseName);
 		const legacyColor = LEGACY_COLORS[hash % LEGACY_COLORS.length];
-		console.log(`🔍 [COLOR DEBUG] Using hash fallback:`, {
+		console.log(`🔍 [COLOR DEBUG] Using hash fallback for legacy MOC:`, {
 			baseName,
 			hash,
 			selectedColor: legacyColor
 		});
 		return legacyColor;
+	}
+
+	private async updateFileWithRandomColors(file: TFile, randomColor: { lightColor: string, darkColor: string, hex: string }): Promise<void> {
+		try {
+			const content = await this.app.vault.read(file);
+			const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+			
+			if (frontmatterMatch) {
+				let frontmatter = frontmatterMatch[1];
+				// Add random color properties if they don't exist
+				if (!frontmatter.includes('root-moc-color:')) {
+					frontmatter += `\nroot-moc-color: ${randomColor.hex}`;
+				}
+				if (!frontmatter.includes('root-moc-light-color:')) {
+					frontmatter += `\nroot-moc-light-color: ${randomColor.lightColor}`;
+				}
+				if (!frontmatter.includes('root-moc-dark-color:')) {
+					frontmatter += `\nroot-moc-dark-color: ${randomColor.darkColor}`;
+				}
+				
+				const newContent = content.replace(frontmatterMatch[0], `---\n${frontmatter}\n---`);
+				await this.app.vault.modify(file, newContent);
+				
+				console.log(`🔍 [COLOR DEBUG] Added random colors to frontmatter for: ${file.path}`);
+			}
+		} catch (error) {
+			console.error(`Failed to update random colors for ${file.path}:`, error);
+		}
 	}
 
 	isRootMOC(file: TFile): boolean {
