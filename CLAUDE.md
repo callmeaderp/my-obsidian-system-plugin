@@ -542,6 +542,35 @@ The plugin has been built and tested successfully with all features implemented 
 
 ## History
 
+### Session 8 - File Explorer Random Color System Fix
+**Purpose**: Fix critical bug where file explorer was displaying all MOCs in blue instead of their assigned random colors.
+
+**Issue Identified**: Despite random colors working correctly in tabs and being properly generated and stored, all MOCs in the file explorer sidebar appeared blue instead of their unique random colors.
+
+**Root Cause Investigation**:
+1. **CSS Conflict Discovery**: User provided computed CSS showing blue color was coming from plugin's own `styles.css` file
+2. **Conflicting Selectors**: The fallback CSS rule `.nav-file-title[data-smart-note-type="group"]:not([data-root-moc-color])` was overriding random colors
+3. **Attribute Mismatch**: Random color system used `data-root-moc-random-color` attribute, but fallback rule only excluded `data-root-moc-color`
+4. **Target Element Issue**: Needed to target `.nav-file-title-content` child element, not the parent `.nav-file-title`
+
+**Technical Fixes Implemented**:
+1. **Updated CSS Exclusions in styles.css** (lines 185, 292, 411, 489):
+   - Changed `:not([data-root-moc-color])` to `:not([data-root-moc-color]):not([data-root-moc-random-color])`
+   - Applied to both file explorer and tab fallback rules
+   - Applied to both light and dark theme variants
+2. **Enhanced Random Color CSS Generation in main.ts** (lines 1766-1775):
+   - Updated selectors to target `.nav-file-title-content` child element
+   - Added dual selector approach (attribute + class) for reliability
+   - Maintained proper CSS specificity to override fallbacks
+
+**User Impact**:
+- ✅ **File explorer now displays unique random colors**: Each root MOC shows its assigned color instead of generic blue
+- ✅ **Consistent color system**: Colors match between file explorer, tabs, and all other UI elements  
+- ✅ **Preserved fallback behavior**: Sub-MOCs without random colors still correctly show blue fallback
+- ✅ **Cross-theme compatibility**: Works correctly in both light and dark themes
+
+**Result**: The unlimited random color system now works completely as intended, with unique colors displaying consistently across all UI components including the file explorer sidebar.
+
 ### Session 4 - Vault Update System Implementation
 **Purpose**: Develop a comprehensive vault modernization tool to keep all files current with latest system requirements.
 

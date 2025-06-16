@@ -182,7 +182,7 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 }
 
 /* MOC/Group Files - Blue and Bold (fallback for sub-MOCs without color attribute) */
-.nav-file-title[data-smart-note-type="group"]:not([data-root-moc-color]) .nav-file-title-content {
+.nav-file-title[data-smart-note-type="group"]:not([data-root-moc-color]):not([data-root-moc-random-color]) .nav-file-title-content {
     color: #2563eb !important;
     font-weight: bold !important;
 }
@@ -289,7 +289,7 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
 }
 
 /* MOC Tabs - Blue and Bold (fallback for sub-MOCs without color attribute) */
-.workspace-tab-header.smart-note-tab-group:not([data-root-moc-color]) .workspace-tab-header-inner-title {
+.workspace-tab-header.smart-note-tab-group:not([data-root-moc-color]):not([data-root-moc-random-color]) .workspace-tab-header-inner-title {
     color: #2563eb !important;
     font-weight: bold !important;
 }
@@ -408,7 +408,7 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
     color: #f43f5e !important;
 }
 
-.theme-dark .nav-file-title[data-smart-note-type="group"]:not([data-root-moc-color]) .nav-file-title-content {
+.theme-dark .nav-file-title[data-smart-note-type="group"]:not([data-root-moc-color]):not([data-root-moc-random-color]) .nav-file-title-content {
     color: #60a5fa !important;
 }
 
@@ -486,7 +486,7 @@ body.smart-note-prompt-iteration .workspace-tab-header.is-active .workspace-tab-
     color: #f43f5e !important;
 }
 
-.theme-dark .workspace-tab-header.smart-note-tab-group:not([data-root-moc-color]) .workspace-tab-header-inner-title {
+.theme-dark .workspace-tab-header.smart-note-tab-group:not([data-root-moc-color]):not([data-root-moc-random-color]) .workspace-tab-header-inner-title {
     color: #60a5fa !important;
 }
 

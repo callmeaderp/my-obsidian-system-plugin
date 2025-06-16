@@ -1545,6 +1545,13 @@ export default class MOCSystemPlugin extends Plugin {
 			item.removeAttribute('data-root-moc-color');
 			item.removeAttribute('data-root-moc-random-color');
 			
+			// Remove existing random color classes
+			Array.from(item.classList).forEach(className => {
+				if (className.startsWith('smart-random-color-')) {
+					item.classList.remove(className);
+				}
+			});
+			
 			const path = item.getAttribute('data-path');
 			if (path) {
 				const file = this.app.vault.getAbstractFileByPath(path);
@@ -1560,9 +1567,13 @@ export default class MOCSystemPlugin extends Plugin {
 							if (color.name.startsWith('#')) {
 								// New random color system
 								item.setAttribute('data-root-moc-random-color', color.name);
+								item.setAttribute('data-root-moc-color', 'random'); // Prevent blue fallback rule
+								
+								// Add CSS class as backup approach
+								const colorId = color.name.replace('#', '');
+								item.classList.add(`smart-random-color-${colorId}`);
 								
 								// Inject CSS for this color if not already present
-								const colorId = color.name.replace('#', '');
 								this.injectRandomColorCSS(colorId, color.lightColor, color.darkColor);
 							} else {
 								// Legacy named colors
@@ -1751,44 +1762,46 @@ export default class MOCSystemPlugin extends Plugin {
 				color: ${darkColor} !important;
 			}
 			
-			/* File explorer styling */
-			.nav-file-title[data-root-moc-random-color="#${colorId}"] {
+			/* File explorer styling - Target the correct child element */
+			.nav-file-title[data-root-moc-random-color="\\#${colorId}"] .nav-file-title-content,
+			.nav-file-title.smart-random-color-${colorId} .nav-file-title-content {
 				color: ${lightColor} !important;
 				font-weight: bold !important;
 			}
 			
-			.theme-dark .nav-file-title[data-root-moc-random-color="#${colorId}"] {
+			.theme-dark .nav-file-title[data-root-moc-random-color="\\#${colorId}"] .nav-file-title-content,
+			.theme-dark .nav-file-title.smart-random-color-${colorId} .nav-file-title-content {
 				color: ${darkColor} !important;
 			}
 			
 			/* Tab styling - Maximum specificity to override all existing CSS */
-			.app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
-			.app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"].is-active .workspace-tab-header-inner-title,
-			.app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"]:not(.is-active) .workspace-tab-header-inner-title,
-			.mod-root .workspace .workspace-tab-header[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
-			.workspace-tab-header[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title {
+			.app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="\\#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
+			.app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="\\#${colorId}"][data-smart-note-type="group"].is-active .workspace-tab-header-inner-title,
+			.app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="\\#${colorId}"][data-smart-note-type="group"]:not(.is-active) .workspace-tab-header-inner-title,
+			.mod-root .workspace .workspace-tab-header[data-root-moc-random-color="\\#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
+			.workspace-tab-header[data-root-moc-random-color="\\#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title {
 				color: ${lightColor} !important;
 				font-weight: bold !important;
 				--root-moc-color-light: ${lightColor} !important;
 				--root-moc-color-dark: ${darkColor} !important;
 			}
 			
-			.theme-dark .app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
-			.theme-dark .app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"].is-active .workspace-tab-header-inner-title,
-			.theme-dark .app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"]:not(.is-active) .workspace-tab-header-inner-title,
-			.theme-dark .mod-root .workspace .workspace-tab-header[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
-			.theme-dark .workspace-tab-header[data-root-moc-random-color="#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title {
+			.theme-dark .app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="\\#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
+			.theme-dark .app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="\\#${colorId}"][data-smart-note-type="group"].is-active .workspace-tab-header-inner-title,
+			.theme-dark .app-container .workspace .workspace-tab-header.smart-note-tab-group[data-root-moc-random-color="\\#${colorId}"][data-smart-note-type="group"]:not(.is-active) .workspace-tab-header-inner-title,
+			.theme-dark .mod-root .workspace .workspace-tab-header[data-root-moc-random-color="\\#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title,
+			.theme-dark .workspace-tab-header[data-root-moc-random-color="\\#${colorId}"][data-smart-note-type="group"] .workspace-tab-header-inner-title {
 				color: ${darkColor} !important;
 				font-weight: bold !important;
 			}
 			
 			/* Backup approach with even higher specificity using ID-like selectors */
-			body .workspace-tab-header[data-root-moc-random-color="#${colorId}"] .workspace-tab-header-inner-title {
+			body .workspace-tab-header[data-root-moc-random-color="\\#${colorId}"] .workspace-tab-header-inner-title {
 				color: ${lightColor} !important;
 				font-weight: bold !important;
 			}
 			
-			body.theme-dark .workspace-tab-header[data-root-moc-random-color="#${colorId}"] .workspace-tab-header-inner-title {
+			body.theme-dark .workspace-tab-header[data-root-moc-random-color="\\#${colorId}"] .workspace-tab-header-inner-title {
 				color: ${darkColor} !important;
 				font-weight: bold !important;
 			}
