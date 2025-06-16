@@ -133,6 +133,22 @@ export default class MOCSystemPlugin extends Plugin {
 			callback: () => this.updateVaultToLatestSystem()
 		});
 
+		// Command to reorganize MOCs
+		this.addCommand({
+			id: 'reorganize-moc',
+			name: 'Reorganize MOC',
+			checkCallback: (checking: boolean) => {
+				const activeFile = this.app.workspace.getActiveFile();
+				if (activeFile && this.isMOC(activeFile)) {
+					if (!checking) {
+						this.reorganizeMOC(activeFile);
+					}
+					return true;
+				}
+				return false;
+			}
+		});
+
 		// Auto-cleanup on file deletion
 		this.registerEvent(
 			this.app.vault.on('delete', (file) => {
@@ -796,6 +812,197 @@ export default class MOCSystemPlugin extends Plugin {
 				}
 			}
 		}
+	}
+
+	async reorganizeMOC(moc: TFile) {
+		// Show reorganization options based on MOC type
+		new ReorganizeMOCModal(this.app, moc, this).open();
+	}
+
+	async moveRootMOCToSub(moc: TFile, parentMOCName: string | null, existingParent: TFile | null) {
+		try {
+			// Step 1: Create or get parent MOC
+			let parentMOC: TFile;
+			if (existingParent) {
+				parentMOC = existingParent;
+			} else {
+				// Create new parent MOC
+				if (!parentMOCName) throw new Error('Parent MOC name required');
+				parentMOC = await this.createMOC(parentMOCName);
+			}
+
+			// Step 2: Update MOC properties and name
+			const mocBaseName = moc.basename.replace(/^[^\s]+\s+/, '').trim(); // Remove emoji prefix
+			const newFileName = `${FOLDERS.MOCs}/${NOTE_TYPES.MOCs.emoji} ${mocBaseName}.md`;
+			
+			// Step 3: Update frontmatter to remove root MOC color properties
+			let content = await this.app.vault.read(moc);
+			const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+			if (frontmatterMatch) {
+				let frontmatter = frontmatterMatch[1];
+				// Remove root MOC color properties
+				frontmatter = frontmatter.replace(/root-moc-color:.*\n/g, '');
+				frontmatter = frontmatter.replace(/root-moc-light-color:.*\n/g, '');
+				frontmatter = frontmatter.replace(/root-moc-dark-color:.*\n/g, '');
+				content = content.replace(frontmatterMatch[0], `---\n${frontmatter}---`);
+			}
+
+			// Step 4: Move file
+			await this.app.vault.modify(moc, content);
+			await this.app.vault.rename(moc, newFileName);
+			const movedMOC = this.app.vault.getAbstractFileByPath(newFileName) as TFile;
+
+			// Step 5: Add to parent MOC
+			await this.addToMOCSection(parentMOC, 'MOCs', movedMOC);
+
+			// Step 6: Update all references
+			await this.updateAllReferences(moc.path, movedMOC.path);
+
+			new Notice(`Moved ${mocBaseName} under ${parentMOC.basename}`);
+			
+			// Open the parent MOC to show the result
+			await this.app.workspace.getLeaf().openFile(parentMOC);
+			
+		} catch (error) {
+			console.error('Error moving MOC:', error);
+			new Notice(`Failed to move MOC: ${error.message}`);
+		}
+	}
+
+	async promoteSubMOCToRoot(moc: TFile) {
+		try {
+			// Step 1: Generate random emoji and color for root MOC
+			const randomEmoji = this.getRandomEmoji();
+			const randomColor = this.generateRandomColor();
+			
+			// Step 2: Extract base name and create new filename
+			const mocBaseName = moc.basename.replace(/^[^\s]+\s+/, '').trim(); // Remove emoji prefix
+			const newFileName = `${randomEmoji} ${mocBaseName}.md`;
+			
+			// Step 3: Update frontmatter to add root MOC color properties
+			let content = await this.app.vault.read(moc);
+			const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+			if (frontmatterMatch) {
+				let frontmatter = frontmatterMatch[1];
+				// Add root MOC color properties
+				frontmatter += `\nroot-moc-color: ${randomColor.hex}`;
+				frontmatter += `\nroot-moc-light-color: ${randomColor.lightColor}`;
+				frontmatter += `\nroot-moc-dark-color: ${randomColor.darkColor}`;
+				content = content.replace(frontmatterMatch[0], `---\n${frontmatter}\n---`);
+			}
+
+			// Step 4: Move file to root
+			await this.app.vault.modify(moc, content);
+			await this.app.vault.rename(moc, newFileName);
+			const movedMOC = this.app.vault.getAbstractFileByPath(newFileName) as TFile;
+
+			// Step 5: Remove from parent MOC(s)
+			await this.removeFromParentMOCs(moc);
+
+			// Step 6: Update all references
+			await this.updateAllReferences(moc.path, movedMOC.path);
+
+			new Notice(`Promoted ${mocBaseName} to root MOC`);
+			
+			// Open the promoted MOC
+			await this.app.workspace.getLeaf().openFile(movedMOC);
+			
+		} catch (error) {
+			console.error('Error promoting MOC:', error);
+			new Notice(`Failed to promote MOC: ${error.message}`);
+		}
+	}
+
+	async moveSubMOCToNewParent(moc: TFile, newParent: TFile) {
+		try {
+			// Step 1: Remove from current parent(s)
+			await this.removeFromParentMOCs(moc);
+
+			// Step 2: Add to new parent
+			await this.addToMOCSection(newParent, 'MOCs', moc);
+
+			new Notice(`Moved ${moc.basename} to ${newParent.basename}`);
+			
+			// Open the new parent MOC
+			await this.app.workspace.getLeaf().openFile(newParent);
+			
+		} catch (error) {
+			console.error('Error moving MOC:', error);
+			new Notice(`Failed to move MOC: ${error.message}`);
+		}
+	}
+
+	async removeFromParentMOCs(moc: TFile) {
+		// Find all MOCs that link to this MOC
+		const allMOCs = this.app.vault.getMarkdownFiles().filter(f => this.isMOC(f));
+		
+		for (const parentMOC of allMOCs) {
+			if (parentMOC === moc) continue;
+			
+			const content = await this.app.vault.read(parentMOC);
+			const linkPattern = new RegExp(`-\\s*\\[\\[${moc.basename}\\]\\]`, 'g');
+			
+			if (linkPattern.test(content)) {
+				// Remove the link
+				const newContent = content.replace(linkPattern, '');
+				const cleanedContent = this.cleanupOrphanedBlankLines(newContent.split('\n'), parentMOC).join('\n');
+				await this.app.vault.modify(parentMOC, cleanedContent);
+			}
+		}
+	}
+
+	async updateAllReferences(oldPath: string, newPath: string) {
+		const allFiles = this.app.vault.getMarkdownFiles();
+		const oldBasename = oldPath.split('/').pop()?.replace('.md', '') || '';
+		const newBasename = newPath.split('/').pop()?.replace('.md', '') || '';
+		
+		for (const file of allFiles) {
+			const content = await this.app.vault.read(file);
+			const linkPattern = new RegExp(`\\[\\[${oldBasename}\\]\\]`, 'g');
+			
+			if (linkPattern.test(content)) {
+				const newContent = content.replace(linkPattern, `[[${newBasename}]]`);
+				await this.app.vault.modify(file, newContent);
+			}
+		}
+	}
+
+	async getAllMOCs(): Promise<TFile[]> {
+		return this.app.vault.getMarkdownFiles().filter(f => this.isMOC(f));
+	}
+
+	detectCircularDependency(moc: TFile, potentialParent: TFile): boolean {
+		// Check if potentialParent is a descendant of moc
+		const visited = new Set<string>();
+		const queue = [moc.path];
+		
+		while (queue.length > 0) {
+			const currentPath = queue.shift()!;
+			if (visited.has(currentPath)) continue;
+			visited.add(currentPath);
+			
+			if (currentPath === potentialParent.path) {
+				return true; // Circular dependency detected
+			}
+			
+			// Get all MOCs linked from current MOC
+			const currentFile = this.app.vault.getAbstractFileByPath(currentPath);
+			if (currentFile instanceof TFile) {
+				const content = this.app.vault.cachedRead(currentFile);
+				content.then(text => {
+					const linkRegex = /\[\[([^\]]+)\]\]/g;
+					let match;
+					while ((match = linkRegex.exec(text)) !== null) {
+						const linkedFile = this.app.metadataCache.getFirstLinkpathDest(match[1], currentPath);
+						if (linkedFile && this.isMOC(linkedFile)) {
+							queue.push(linkedFile.path);
+						}
+					}
+				});
+			}
+		}
+		
+		return false;
 	}
 
 	async updateVaultToLatestSystem() {
@@ -1630,7 +1837,7 @@ export default class MOCSystemPlugin extends Plugin {
 		return legacyColor;
 	}
 
-	private isRootMOC(file: TFile): boolean {
+	isRootMOC(file: TFile): boolean {
 		return this.isMOC(file) && !file.path.includes('/');
 	}
 }
@@ -1960,6 +2167,234 @@ class CleanupConfirmationModal extends Modal {
 		});
 		confirmButton.addEventListener('click', () => {
 			this.onConfirm();
+			this.close();
+		});
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+class ReorganizeMOCModal extends Modal {
+	constructor(
+		app: App,
+		private moc: TFile,
+		private plugin: MOCSystemPlugin
+	) {
+		super(app);
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		const isRootMOC = this.plugin.isRootMOC(this.moc);
+		
+		contentEl.createEl('h2', { text: `Reorganize "${this.moc.basename}"` });
+		
+		if (isRootMOC) {
+			contentEl.createEl('p', { text: 'This is a root-level MOC. Choose how to reorganize it:' });
+			
+			// Option 1: Move under new parent
+			const newParentButton = contentEl.createEl('button', { 
+				text: 'Move under new parent MOC',
+				cls: 'mod-cta'
+			});
+			newParentButton.style.display = 'block';
+			newParentButton.style.marginBottom = '10px';
+			newParentButton.style.width = '100%';
+			newParentButton.addEventListener('click', () => {
+				this.close();
+				new CreateParentMOCModal(this.app, this.moc, this.plugin).open();
+			});
+			
+			// Option 2: Move under existing MOC
+			const existingParentButton = contentEl.createEl('button', { 
+				text: 'Move under existing MOC'
+			});
+			existingParentButton.style.display = 'block';
+			existingParentButton.style.marginBottom = '10px';
+			existingParentButton.style.width = '100%';
+			existingParentButton.addEventListener('click', async () => {
+				const allMOCs = await this.plugin.getAllMOCs();
+				const availableMOCs = allMOCs.filter(m => m !== this.moc && !this.plugin.detectCircularDependency(this.moc, m));
+				
+				if (availableMOCs.length === 0) {
+					new Notice('No suitable parent MOCs available');
+					return;
+				}
+				
+				this.close();
+				new SelectParentMOCModal(this.app, this.moc, availableMOCs, this.plugin).open();
+			});
+			
+		} else {
+			// Sub-MOC options
+			contentEl.createEl('p', { text: 'This is a sub-MOC. Choose how to reorganize it:' });
+			
+			// Option 1: Promote to root
+			const promoteButton = contentEl.createEl('button', { 
+				text: 'Promote to root MOC',
+				cls: 'mod-cta'
+			});
+			promoteButton.style.display = 'block';
+			promoteButton.style.marginBottom = '10px';
+			promoteButton.style.width = '100%';
+			promoteButton.addEventListener('click', () => {
+				this.plugin.promoteSubMOCToRoot(this.moc);
+				this.close();
+			});
+			
+			// Option 2: Move to different parent
+			const moveButton = contentEl.createEl('button', { 
+				text: 'Move to different parent'
+			});
+			moveButton.style.display = 'block';
+			moveButton.style.marginBottom = '10px';
+			moveButton.style.width = '100%';
+			moveButton.addEventListener('click', async () => {
+				const allMOCs = await this.plugin.getAllMOCs();
+				const availableMOCs = allMOCs.filter(m => m !== this.moc && !this.plugin.detectCircularDependency(this.moc, m));
+				
+				if (availableMOCs.length === 0) {
+					new Notice('No suitable parent MOCs available');
+					return;
+				}
+				
+				this.close();
+				new SelectParentMOCModal(this.app, this.moc, availableMOCs, this.plugin, true).open();
+			});
+		}
+		
+		// Cancel button
+		const cancelButton = contentEl.createEl('button', { text: 'Cancel' });
+		cancelButton.style.display = 'block';
+		cancelButton.style.marginTop = '20px';
+		cancelButton.style.width = '100%';
+		cancelButton.addEventListener('click', () => {
+			this.close();
+		});
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+class CreateParentMOCModal extends Modal {
+	constructor(
+		app: App,
+		private childMOC: TFile,
+		private plugin: MOCSystemPlugin
+	) {
+		super(app);
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.createEl('h2', { text: 'Create new parent MOC' });
+		contentEl.createEl('p', { text: `This will create a new MOC and move "${this.childMOC.basename}" under it.` });
+
+		const inputEl = contentEl.createEl('input', {
+			type: 'text',
+			placeholder: 'Parent MOC name...'
+		});
+		inputEl.style.width = '100%';
+		inputEl.style.marginBottom = '15px';
+		inputEl.focus();
+
+		const buttonContainer = contentEl.createDiv();
+		buttonContainer.style.display = 'flex';
+		buttonContainer.style.gap = '10px';
+
+		const cancelButton = buttonContainer.createEl('button', { text: 'Cancel' });
+		cancelButton.addEventListener('click', () => {
+			this.close();
+		});
+
+		const createButton = buttonContainer.createEl('button', { 
+			text: 'Create & Move',
+			cls: 'mod-cta'
+		});
+		
+		const submitFn = () => {
+			const name = inputEl.value.trim();
+			if (name) {
+				this.plugin.moveRootMOCToSub(this.childMOC, name, null);
+				this.close();
+			}
+		};
+		
+		createButton.addEventListener('click', submitFn);
+		inputEl.addEventListener('keypress', (e) => {
+			if (e.key === 'Enter' && inputEl.value) {
+				submitFn();
+			}
+		});
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+class SelectParentMOCModal extends Modal {
+	constructor(
+		app: App,
+		private childMOC: TFile,
+		private availableMOCs: TFile[],
+		private plugin: MOCSystemPlugin,
+		private isMovingSubMOC: boolean = false
+	) {
+		super(app);
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.createEl('h2', { text: 'Select parent MOC' });
+		contentEl.createEl('p', { text: `Choose where to move "${this.childMOC.basename}":` });
+
+		// Create scrollable list
+		const listContainer = contentEl.createDiv();
+		listContainer.style.maxHeight = '300px';
+		listContainer.style.overflowY = 'auto';
+		listContainer.style.border = '1px solid var(--background-modifier-border)';
+		listContainer.style.padding = '10px';
+		listContainer.style.marginBottom = '15px';
+
+		// Sort MOCs by path for better organization
+		const sortedMOCs = this.availableMOCs.sort((a, b) => a.path.localeCompare(b.path));
+
+		for (const moc of sortedMOCs) {
+			const item = listContainer.createDiv();
+			item.style.padding = '5px 10px';
+			item.style.cursor = 'pointer';
+			item.style.borderRadius = '3px';
+			item.textContent = moc.path;
+			
+			item.addEventListener('mouseenter', () => {
+				item.style.backgroundColor = 'var(--background-modifier-hover)';
+			});
+			
+			item.addEventListener('mouseleave', () => {
+				item.style.backgroundColor = '';
+			});
+			
+			item.addEventListener('click', () => {
+				if (this.isMovingSubMOC) {
+					this.plugin.moveSubMOCToNewParent(this.childMOC, moc);
+				} else {
+					this.plugin.moveRootMOCToSub(this.childMOC, null, moc);
+				}
+				this.close();
+			});
+		}
+
+		const cancelButton = contentEl.createEl('button', { text: 'Cancel' });
+		cancelButton.style.width = '100%';
+		cancelButton.addEventListener('click', () => {
 			this.close();
 		});
 	}

@@ -112,7 +112,29 @@ The prompt system is designed for iterative LLM conversations:
   - Resource
   - Prompt
 
-### 2. Prompt Iteration Duplication
+### 2. MOC Reorganization System
+**Command**: "Reorganize MOC"
+
+**New Feature**: Flexible MOC hierarchy management for emergent organization patterns
+
+- **Context-aware reorganization**: Different options based on whether viewing root or sub-MOC
+- **Root MOC options**:
+  - Move under new parent MOC (creates parent automatically)
+  - Move under existing MOC (with searchable selection)
+- **Sub-MOC options**:
+  - Promote to root MOC (with new random emoji/color)
+  - Move to different parent MOC
+- **Automatic handling**:
+  - Updates all file references vault-wide
+  - Manages emoji/color transitions (random ↔ blue)
+  - Preserves all content and children
+  - Removes/adds parent MOC links automatically
+- **Safety features**:
+  - Circular dependency detection
+  - Name conflict prevention
+  - Preserves entire MOC hierarchies when moving
+
+### 3. Prompt Iteration Duplication
 **Command**: "Duplicate prompt iteration"
 
 - Works when viewing any prompt iteration file
@@ -120,14 +142,14 @@ The prompt system is designed for iterative LLM conversations:
 - Shows modal for optional description
 - Updates the prompt hub automatically
 
-### 3. Multi-Link Opening
+### 4. Multi-Link Opening
 **Command**: "Open all LLM links"
 
 - Works when viewing a prompt hub
 - Parses `llm-links` code block
 - Opens all URLs in new browser tabs
 
-### 4. Note Type Styling System
+### 5. Note Type Styling System
 **New Feature**: Visual distinction for note types
 
 - **Emoji Prefixes**: All created notes include type-specific emojis:
@@ -152,7 +174,7 @@ The prompt system is designed for iterative LLM conversations:
   - Graph view nodes with size differentiation
   - Both light and dark themes
 
-### 5. System Cleanup Command
+### 6. System Cleanup Command
 **Command**: "Cleanup MOC system files"
 
 - Safely removes all files created by the plugin
@@ -161,7 +183,7 @@ The prompt system is designed for iterative LLM conversations:
 - Preserves plugin folders (MOCs/, Notes/, Resources/, Prompts/) for reuse
 - Preserves all pre-existing files without plugin metadata
 
-### 6. Unlimited Random System for Root MOCs
+### 7. Unlimited Random System for Root MOCs
 **Latest Feature**: Truly unlimited visual customization for root-level MOCs
 
 - **Unlimited Random Emojis**: Selects from entire Unicode emoji ranges (thousands of possibilities)
@@ -176,7 +198,7 @@ The prompt system is designed for iterative LLM conversations:
 - **Full Backward Compatibility**: Legacy emoji-based and named color systems still supported
 - **Complete Visual Coverage**: Random colors apply to file explorer, tabs, active file indicators, and graph view
 
-### 7. Vault Update System
+### 8. Vault Update System
 **New Feature**: Comprehensive vault modernization tool
 
 - **Intelligent Analysis**: Scans entire vault to detect files needing updates for latest system requirements
@@ -191,7 +213,7 @@ The prompt system is designed for iterative LLM conversations:
 - Notes/Resources/Prompts: Emoji prefixes, metadata, structural requirements
 - Prompt Hubs: Iterations and LLM Links sections
 
-### 8. Automatic Features
+### 9. Automatic Features
 
 - **Folder Structure**: Creates required folders on plugin load
 - **Section Management**: Intelligently reorganizes MOC content to keep plugin sections at the top
@@ -201,7 +223,7 @@ The prompt system is designed for iterative LLM conversations:
 
 ## Command Reference
 
-The plugin registers 6 commands with Obsidian's command palette:
+The plugin registers 7 commands with Obsidian's command palette:
 
 ### Primary Commands
 
@@ -218,25 +240,31 @@ The plugin registers 6 commands with Obsidian's command palette:
 - **Behavior**: Analyzes filename, finds next version number, prompts for description
 - **Implementation**: `duplicatePromptIteration()` → `PromptDescriptionModal`
 
-#### 3. Open all LLM links (`open-llm-links`)
+#### 3. Reorganize MOC (`reorganize-moc`)
+- **Description**: Reorganize MOC hierarchies by moving MOCs between root and sub-MOC levels
+- **Availability**: Only enabled when viewing a MOC file
+- **Behavior**: Shows context-aware options based on MOC type (root vs sub-MOC)
+- **Implementation**: `reorganizeMOC()` → `ReorganizeMOCModal` → movement methods
+
+#### 4. Open all LLM links (`open-llm-links`)
 - **Description**: Opens all URLs in the `llm-links` code block in browser tabs
 - **Availability**: Only enabled when viewing a prompt hub file
 - **Behavior**: Parses code block, validates URLs, opens in new tabs
 - **Implementation**: `openLLMLinks()` with regex parsing
 
-#### 4. Cleanup MOC system files (`cleanup-moc-system`)
+#### 5. Cleanup MOC system files (`cleanup-moc-system`)
 - **Description**: Safely removes all plugin-created files with confirmation
 - **Behavior**: Scans for files with `note-type` metadata, shows list, requires confirmation
 - **Implementation**: `cleanupMOCSystem()` → `CleanupConfirmationModal`
 
-#### 5. Update vault to latest system (`update-vault-system`)
+#### 6. Update vault to latest system (`update-vault-system`)
 - **Description**: Updates all vault files to match the latest system requirements
 - **Behavior**: Scans vault, shows update plan with detailed preview, applies changes with confirmation
 - **Implementation**: `updateVaultToLatestSystem()` → `VaultUpdateModal` → `executeUpdatePlan()`
 
 ### Development Commands
 
-#### 6. Test random emoji and color system (`test-random-system`)
+#### 7. Test random emoji and color system (`test-random-system`)
 - **Description**: Development tool for testing unlimited random generation
 - **Behavior**: Generates sample emojis/colors, creates test MOC, logs to console
 - **Implementation**: `testRandomSystem()` with comprehensive logging
@@ -334,6 +362,16 @@ export default class MOCSystemPlugin extends Plugin {
 - `isRootMOC()`: Determines if a MOC is a root-level MOC (not in subfolder)
 - `hashString()`: Legacy method for backward compatibility with old hash-based colors
 
+#### MOC Reorganization System
+- `reorganizeMOC()`: Entry point that shows context-aware reorganization modal
+- `moveRootMOCToSub()`: Converts root MOC to sub-MOC under specified parent
+- `promoteSubMOCToRoot()`: Converts sub-MOC to root MOC with new random properties
+- `moveSubMOCToNewParent()`: Moves sub-MOC from one parent to another
+- `removeFromParentMOCs()`: Removes MOC links from all parent MOCs
+- `updateAllReferences()`: Updates all vault-wide references after MOC move
+- `getAllMOCs()`: Returns all MOC files in the vault
+- `detectCircularDependency()`: Prevents creating circular MOC hierarchies
+
 #### Vault Update System
 - `updateVaultToLatestSystem()`: Main entry point for vault updates, orchestrates analysis and execution
 - `analyzeVaultForUpdates()`: Scans all files and creates comprehensive update plan
@@ -405,6 +443,21 @@ The plugin includes several custom modals extending Obsidian's `Modal` class:
 - **Purpose**: Preview and confirmation dialog for vault updates
 - **Features**: Detailed file-by-file update preview, scrollable update list, styled file groupings
 - **Safety**: Shows exactly what changes will be made before execution
+
+#### 7. ReorganizeMOCModal (lines 2180-2283)
+- **Purpose**: Context-aware reorganization options for MOCs
+- **Features**: Different options for root vs sub-MOCs, circular dependency checking
+- **Flow**: Main entry point that leads to other reorganization modals
+
+#### 8. CreateParentMOCModal (lines 2285-2341)
+- **Purpose**: Create new parent MOC when moving root MOC to sub-MOC
+- **Features**: Text input for parent name, creates parent and moves child in one operation
+- **Usage**: Triggered from ReorganizeMOCModal for "Move under new parent" option
+
+#### 9. SelectParentMOCModal (lines 2343-2406)
+- **Purpose**: Select existing MOC as parent when reorganizing
+- **Features**: Scrollable list of available MOCs, filters out circular dependencies
+- **Usage**: Works for both root→sub and sub→sub MOC movements
 
 ### Event Handling System
 
@@ -481,7 +534,9 @@ The plugin has been fully implemented with all requested features plus recent im
 
 The plugin has been built and tested successfully with all features implemented and working. The unlimited random color system now provides truly infinite color variety for root MOCs, with persistent styling across all UI elements. **The tab styling system is now fully functional** - random colors display correctly for both active and inactive root MOC tabs, resolving the final issue where colors worked in the sidebar but not in tabs.
 
-**Latest Addition**: **Vault Update System** - A comprehensive modernization tool that scans the entire vault, analyzes what files need updates for the latest system requirements, shows a detailed preview of planned changes, and safely applies updates with full progress tracking and error handling. This ensures users can seamlessly upgrade their vault as the system evolves.
+**Previous Addition**: **Vault Update System** - A comprehensive modernization tool that scans the entire vault, analyzes what files need updates for the latest system requirements, shows a detailed preview of planned changes, and safely applies updates with full progress tracking and error handling. This ensures users can seamlessly upgrade their vault as the system evolves.
+
+**Latest Addition**: **MOC Reorganization System** - A flexible hierarchy management system that allows MOCs to be reorganized as knowledge structures evolve. Root MOCs can be moved under parents (new or existing), sub-MOCs can be promoted to root level or moved between parents, and all file operations, reference updates, and visual transitions are handled automatically. This addresses the emergent nature of knowledge organization where optimal structures become apparent over time.
 
 **Documentation Status**: The CLAUDE.md file has been comprehensively updated with detailed project structure, configuration details, command reference, constants documentation, and enhanced implementation details including line number references for easy navigation.
 
@@ -546,6 +601,32 @@ The plugin has been built and tested successfully with all features implemented 
 - This allows proper file identification and color application to tabs
 
 **Result**: Tab styling system now fully functional with random colors displaying correctly for both active and inactive root MOC tabs.
+
+### Session 5 - MOC Reorganization System
+**Purpose**: Implement flexible MOC hierarchy management to handle emergent organization patterns.
+
+**Context**: User identified that MOC organization needs often evolve over time - what starts as a root MOC may later need to become a sub-MOC under a broader category, and hierarchies need to be flexible.
+
+**Features Implemented**:
+- **"Reorganize MOC" Command**: Context-aware command that adapts based on current MOC type
+- **Root MOC Options**: Move under new parent (creates parent) or existing parent
+- **Sub-MOC Options**: Promote to root with new random properties or move to different parent
+- **Automatic Handling**: File moves, reference updates, emoji/color transitions, parent link management
+- **Safety Features**: Circular dependency detection, name conflict prevention
+
+**Technical Implementation**:
+1. **Core Methods**: `reorganizeMOC()`, `moveRootMOCToSub()`, `promoteSubMOCToRoot()`, `moveSubMOCToNewParent()`
+2. **Helper Methods**: `removeFromParentMOCs()`, `updateAllReferences()`, `getAllMOCs()`, `detectCircularDependency()`
+3. **Modal Classes**: `ReorganizeMOCModal`, `CreateParentMOCModal`, `SelectParentMOCModal`
+4. **Comprehensive Updates**: Handles frontmatter, filenames, locations, and all vault-wide references
+
+**User Benefits**:
+- Vault organization can evolve naturally as knowledge structure emerges
+- No manual work required for complex reorganizations
+- Preserves all content and relationships during moves
+- Supports iterative refinement of information architecture
+
+**Result**: Users can now freely reorganize their MOC hierarchies as their understanding and organization needs evolve, with all technical details handled automatically by the plugin.
 
 ### Session 1 - Initial Implementation
 *Initial implementation completed with all core features and unlimited random color system*
