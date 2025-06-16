@@ -628,5 +628,43 @@ The plugin has been built and tested successfully with all features implemented 
 
 **Result**: Users can now freely reorganize their MOC hierarchies as their understanding and organization needs evolve, with all technical details handled automatically by the plugin.
 
+### Session 6 - MOC Reorganization Bug Fixes
+**Purpose**: Fix critical bugs in the MOC reorganization system identified during user testing.
+
+**Issues Identified**:
+1. **Frontmatter Corruption**: Missing newline in YAML frontmatter replacement causing invalid format
+   - Problem: `root-moc-dark-color: #c5d0ff---` (missing newline before closing `---`)
+   - Root cause: Incorrect string replacement in frontmatter reconstruction
+2. **Broken Link Updates**: Reference updates failing due to stale file paths after renaming
+   - Problem: Using `moc.path` after file was already renamed, causing incorrect old path
+   - Root cause: File object path changes after `vault.rename()` operation
+
+**Technical Fixes Implemented**:
+1. **Fixed Frontmatter Format** (main.ts:847, 897):
+   - Added missing newline in `moveRootMOCToSub()` frontmatter replacement
+   - Added missing newline in `promoteSubMOCToRoot()` frontmatter replacement
+   - Changed from `\`---\n${frontmatter}---\`` to `\`---\n${frontmatter}\n---\``
+
+2. **Fixed Reference Updates** (main.ts:838, 862, 877, 909):
+   - Store original file path before any modifications in both reorganization methods
+   - Use stored original path for `updateAllReferences()` calls instead of post-rename path
+   - Ensures all vault-wide link updates work correctly
+
+**Changes Made**:
+- **Lines 838-839**: Added `originalPath` storage in `moveRootMOCToSub()`
+- **Line 847**: Fixed frontmatter newline in `moveRootMOCToSub()`
+- **Line 862**: Use `originalPath` for reference updates in `moveRootMOCToSub()`
+- **Lines 877-878**: Added `originalPath` storage in `promoteSubMOCToRoot()`
+- **Line 897**: Fixed frontmatter newline in `promoteSubMOCToRoot()`
+- **Line 909**: Use `originalPath` for reference updates in `promoteSubMOCToRoot()`
+
+**User Impact**:
+- MOC reorganization now preserves proper YAML frontmatter formatting
+- All file references update correctly when MOCs are moved between hierarchies
+- Links remain functional after reorganization operations
+- System maintains data integrity during complex file operations
+
+**Result**: The reorganize MOC command now works reliably with proper frontmatter formatting and complete link preservation across all vault files.
+
 ### Session 1 - Initial Implementation
 *Initial implementation completed with all core features and unlimited random color system*

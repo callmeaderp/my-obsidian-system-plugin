@@ -835,7 +835,10 @@ export default class MOCSystemPlugin extends Plugin {
 			const mocBaseName = moc.basename.replace(/^[^\s]+\s+/, '').trim(); // Remove emoji prefix
 			const newFileName = `${FOLDERS.MOCs}/${NOTE_TYPES.MOCs.emoji} ${mocBaseName}.md`;
 			
-			// Step 3: Update frontmatter to remove root MOC color properties
+			// Step 3: Store the original path before any modifications
+			const originalPath = moc.path;
+			
+			// Step 4: Update frontmatter to remove root MOC color properties
 			let content = await this.app.vault.read(moc);
 			const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
 			if (frontmatterMatch) {
@@ -844,19 +847,19 @@ export default class MOCSystemPlugin extends Plugin {
 				frontmatter = frontmatter.replace(/root-moc-color:.*\n/g, '');
 				frontmatter = frontmatter.replace(/root-moc-light-color:.*\n/g, '');
 				frontmatter = frontmatter.replace(/root-moc-dark-color:.*\n/g, '');
-				content = content.replace(frontmatterMatch[0], `---\n${frontmatter}---`);
+				content = content.replace(frontmatterMatch[0], `---\n${frontmatter}\n---`);
 			}
 
-			// Step 4: Move file
+			// Step 5: Move file
 			await this.app.vault.modify(moc, content);
 			await this.app.vault.rename(moc, newFileName);
 			const movedMOC = this.app.vault.getAbstractFileByPath(newFileName) as TFile;
 
-			// Step 5: Add to parent MOC
+			// Step 6: Add to parent MOC
 			await this.addToMOCSection(parentMOC, 'MOCs', movedMOC);
 
-			// Step 6: Update all references
-			await this.updateAllReferences(moc.path, movedMOC.path);
+			// Step 7: Update all references using the original path
+			await this.updateAllReferences(originalPath, movedMOC.path);
 
 			new Notice(`Moved ${mocBaseName} under ${parentMOC.basename}`);
 			
@@ -871,15 +874,18 @@ export default class MOCSystemPlugin extends Plugin {
 
 	async promoteSubMOCToRoot(moc: TFile) {
 		try {
-			// Step 1: Generate random emoji and color for root MOC
+			// Step 1: Store the original path before any modifications
+			const originalPath = moc.path;
+			
+			// Step 2: Generate random emoji and color for root MOC
 			const randomEmoji = this.getRandomEmoji();
 			const randomColor = this.generateRandomColor();
 			
-			// Step 2: Extract base name and create new filename
+			// Step 3: Extract base name and create new filename
 			const mocBaseName = moc.basename.replace(/^[^\s]+\s+/, '').trim(); // Remove emoji prefix
 			const newFileName = `${randomEmoji} ${mocBaseName}.md`;
 			
-			// Step 3: Update frontmatter to add root MOC color properties
+			// Step 4: Update frontmatter to add root MOC color properties
 			let content = await this.app.vault.read(moc);
 			const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
 			if (frontmatterMatch) {
@@ -891,16 +897,16 @@ export default class MOCSystemPlugin extends Plugin {
 				content = content.replace(frontmatterMatch[0], `---\n${frontmatter}\n---`);
 			}
 
-			// Step 4: Move file to root
+			// Step 5: Move file to root
 			await this.app.vault.modify(moc, content);
 			await this.app.vault.rename(moc, newFileName);
 			const movedMOC = this.app.vault.getAbstractFileByPath(newFileName) as TFile;
 
-			// Step 5: Remove from parent MOC(s)
+			// Step 6: Remove from parent MOC(s)
 			await this.removeFromParentMOCs(moc);
 
-			// Step 6: Update all references
-			await this.updateAllReferences(moc.path, movedMOC.path);
+			// Step 7: Update all references using the original path
+			await this.updateAllReferences(originalPath, movedMOC.path);
 
 			new Notice(`Promoted ${mocBaseName} to root MOC`);
 			
