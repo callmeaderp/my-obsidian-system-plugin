@@ -44,11 +44,37 @@ The plugin consists of the following key files:
 
 ### File Organization Structure
 
-- **Top-level MOCs**: Created in vault root directory with random colored emoji prefix and "MOC" suffix
-- **Sub-MOCs**: Stored in `MOCs/` folder with 🔵 emoji prefix and "MOC" suffix
-- **Notes**: Stored in `Notes/` folder with 📝 emoji prefix  
-- **Resources**: Stored in `Resources/` folder with 📁 emoji prefix
-- **Prompts**: Stored in `Prompts/` folder with 🤖 emoji prefix (includes both hubs and iterations)
+**NEW HIERARCHICAL STRUCTURE** (as of latest update):
+
+Each MOC (both root and sub) now has its own dedicated folder containing:
+- The MOC file itself
+- Subfolders for Notes/, Resources/, and Prompts/
+- Sub-MOCs create nested folders within their parent MOC folder
+
+```
+/ (vault root)
+├── 🚕 Project MOC/
+│   ├── 🚕 Project MOC.md
+│   ├── Notes/
+│   │   └── 📝 Some Note.md
+│   ├── Resources/
+│   │   └── 📁 Some Resource.md
+│   ├── Prompts/
+│   │   ├── 🤖 AI Assistant.md (hub)
+│   │   └── 🤖 AI Assistant v1.md (iteration)
+│   └── 🎨 Sub Project MOC/
+│       ├── 🎨 Sub Project MOC.md
+│       ├── Notes/
+│       ├── Resources/
+│       └── Prompts/
+```
+
+**Color and Emoji System**:
+- **Root MOCs**: Random emoji from entire Unicode ranges + random RGB colors (unlimited variety)
+- **Sub-MOCs**: Random emoji from entire Unicode ranges + random RGB colors (same as root MOCs)
+- **Notes**: 📝 emoji prefix with green color (#16a34a)
+- **Resources**: 📁 emoji prefix with orange color (#ea580c)
+- **Prompts**: 🤖 emoji prefix with purple colors (hub: #9333ea, iterations: #c084fc)
 
 All files include frontmatter with `note-type` metadata for CSS targeting and backwards compatibility.
 
@@ -150,18 +176,18 @@ The prompt system is designed for iterative LLM conversations:
 - Opens all URLs in new browser tabs
 
 ### 5. Note Type Styling System
-**New Feature**: Visual distinction for note types
+**Updated Feature**: Visual distinction for note types with hierarchical folder structure
 
 - **Emoji Prefixes**: All created notes include type-specific emojis:
   - Root MOCs: Completely random emoji from entire Unicode ranges (unlimited variety)
-  - Sub-MOCs: 🔵 (Blue circle)
+  - Sub-MOCs: Completely random emoji from entire Unicode ranges (same as root MOCs)
   - Notes: 📝 (Memo emoji)
   - Resources: 📁 (Folder emoji)  
   - Prompts: 🤖 (Robot emoji)
 
 - **CSS Color Coding**: Unique colors for each note type:
   - Root MOCs: Completely random RGB colors (unlimited variety) with bold styling
-  - Sub-MOCs: Blue (#2563eb) with bold styling
+  - Sub-MOCs: Completely random RGB colors (same as root MOCs) with bold styling
   - Notes: Green (#16a34a)
   - Resources: Orange (#ea580c)
   - Prompt Hubs: Dark Purple (#9333ea) with bold styling
@@ -322,11 +348,12 @@ export default class MOCSystemPlugin extends Plugin {
 ### Key Methods
 
 #### Content Creation Methods
-- `createMOC()`: Creates top-level MOC with unlimited random emoji and RGB color, "MOC" suffix, frontmatter tags, and note-type metadata
-- `createSubMOC()`: Creates MOC in MOCs/ folder with blue emoji prefix, "MOC" suffix, and links from parent
-- `createNote()`: Creates note in Notes/ folder with emoji prefix and links from parent MOC
-- `createResource()`: Creates resource in Resources/ folder with emoji prefix and links from parent
-- `createPrompt()`: Creates prompt hub and iteration with emoji prefixes, metadata, and LLM links block
+- `createMOC()`: Creates top-level MOC with its own folder structure, unlimited random emoji and RGB color, "MOC" suffix, frontmatter tags, and note-type metadata
+- `createSubMOC()`: Creates sub-MOC with its own folder structure within parent MOC folder, random emoji prefix, "MOC" suffix, random colors, and links from parent
+- `createNote()`: Creates note in parent MOC's Notes/ subfolder with emoji prefix and links from parent MOC
+- `createResource()`: Creates resource in parent MOC's Resources/ subfolder with emoji prefix and links from parent
+- `createPrompt()`: Creates prompt hub and iteration in parent MOC's Prompts/ subfolder with emoji prefixes, metadata, and LLM links block
+- `ensureMOCFolderStructure()`: Creates complete folder hierarchy for a MOC including Notes/, Resources/, and Prompts/ subfolders
 
 #### Section Management
 - `addToMOCSection()`: Intelligently manages MOC sections with content reorganization
@@ -362,24 +389,27 @@ export default class MOCSystemPlugin extends Plugin {
 - `isRootMOC()`: Determines if a MOC is a root-level MOC (not in subfolder)
 - `hashString()`: Legacy method for backward compatibility with old hash-based colors
 
-#### MOC Reorganization System
+#### MOC Reorganization System (Updated for Hierarchical Structure)
 - `reorganizeMOC()`: Entry point that shows context-aware reorganization modal
-- `moveRootMOCToSub()`: Converts root MOC to sub-MOC under specified parent
-- `promoteSubMOCToRoot()`: Converts sub-MOC to root MOC with new random properties
-- `moveSubMOCToNewParent()`: Moves sub-MOC from one parent to another
+- `moveRootMOCToSub()`: Moves entire root MOC folder structure under specified parent MOC folder
+- `promoteSubMOCToRoot()`: Moves entire sub-MOC folder structure to vault root level
+- `moveSubMOCToNewParent()`: Moves complete sub-MOC folder hierarchy between parent MOCs
 - `removeFromParentMOCs()`: Removes MOC links from all parent MOCs
 - `updateAllReferences()`: Updates all vault-wide references after MOC move
+- `updateAllFolderReferences()`: Updates all file references when entire folders are moved
 - `getAllMOCs()`: Returns all MOC files in the vault
 - `detectCircularDependency()`: Prevents creating circular MOC hierarchies
 
-#### Vault Update System
+#### Vault Update System (Updated for Hierarchical Structure)
 - `updateVaultToLatestSystem()`: Main entry point for vault updates, orchestrates analysis and execution
 - `analyzeVaultForUpdates()`: Scans all files and creates comprehensive update plan
-- `detectRequiredUpdates()`: Analyzes individual files to determine what updates are needed
+- `detectRequiredUpdates()`: Analyzes individual files to determine what updates are needed, including hierarchical migration
 - `executeUpdatePlan()`: Applies all planned updates with progress tracking and error handling
 - `updateFile()`: Handles individual file updates with safe file operations
 - `addMissingNoteType()`: Adds note-type metadata to frontmatter
-- `addRandomColorSystem()`: Injects random color properties to root MOC frontmatter
+- `addRandomColorSystem()`: Injects random color properties to MOC frontmatter
+- `migrateToHierarchicalStructure()`: Migrates files from old flat structure to new hierarchical folder system
+- `needsFolderMigration()`: Detects files that need migration to hierarchical structure
 - `updateFileName()`: Safely renames files with emoji prefixes and suffixes
 - `moveFileToCorrectLocation()`: Moves files to appropriate plugin folders
 - `updatePromptHubStructure()`: Adds missing Iterations and LLM Links sections
@@ -387,12 +417,14 @@ export default class MOCSystemPlugin extends Plugin {
 #### Maintenance
 - `cleanupBrokenLinks()`: Removes references to deleted files and cleans up orphaned blank lines
 - `cleanupOrphanedBlankLines()`: Helper method to remove blank lines left after link deletion in plugin sections
-- `ensureFolderStructure()`: Creates required folders if missing
+- `ensureFolderStructure()`: Legacy method, no longer used with hierarchical structure
+- `ensureMOCFolderStructure()`: Creates complete folder hierarchy for individual MOCs
 - `cleanupMOCSystem()`: Removes all plugin-created files based on note-type metadata
 - `cleanupEmptyPluginFolders()`: Removes empty plugin folders after cleanup
 
 ### File Detection Methods
 - `isMOC()`: Checks for `#moc` tag in frontmatter
+- `isRootMOC()`: Updated to work with hierarchical structure - determines if MOC folder is at vault root
 - `isPromptIteration()`: Detects files with version pattern (v1, v2, etc.)
 - `isPromptHub()`: Identifies prompt files that aren't iterations
 
@@ -499,6 +531,9 @@ The plugin implements comprehensive event handling for real-time UI updates:
 6. **Unlimited randomization**: Pure random generation for both emojis and colors with no constraints
 7. **Dynamic CSS injection**: Each unique color gets its own CSS rules for optimal performance
 8. **Multi-layer compatibility**: Supports unlimited random, legacy hash-based, and emoji-based color systems
+9. **Hierarchical folder structure**: Each MOC gets its own folder for better organization and scalability
+10. **Folder-based operations**: All reorganization commands work with complete folder structures
+11. **Unified color system**: Both root and sub-MOCs use the same unlimited random color system
 
 ## Current Status
 
@@ -508,9 +543,9 @@ The plugin has been fully implemented with all requested features plus recent im
 - ✅ Multi-link opening for LLM chats
 - ✅ Dynamic section management
 - ✅ Automatic link cleanup
-- ✅ Folder structure creation
+- ✅ **MAJOR UPDATE**: Hierarchical folder structure - each MOC has its own folder with subfolders
 - ✅ **NEW**: Emoji-prefixed note titles with type indicators and "MOC" suffix for MOCs
-- ✅ **NEW**: Comprehensive CSS styling system with distinct colors for all note types
+- ✅ **UPDATED**: Comprehensive CSS styling system with distinct colors for all note types
 - ✅ **NEW**: Non-destructive MOC behavior (preserves existing content as "scratch pad")
 - ✅ **NEW**: Tab title styling for all tabs (not just active files)
 - ✅ **NEW**: Differentiated styling for prompt hubs vs iterations
@@ -518,7 +553,7 @@ The plugin has been fully implemented with all requested features plus recent im
 - ✅ **NEW**: Robust content reorganization that moves plugin sections to top while preserving user content
 - ✅ **NEW**: Enhanced folder preservation during cleanup (folders are kept, only files removed)
 - ✅ **FIXED**: Blank line preservation issue - plugin no longer preserves orphaned blank lines from deleted entries
-- ✅ **LATEST**: Unlimited random system for root MOCs - truly random emojis and RGB colors with infinite variety
+- ✅ **UPDATED**: Sub-MOCs now use unlimited random system (same as root MOCs) instead of fixed blue emoji
 - ✅ **LATEST**: Dynamic CSS injection system for unlimited color customization
 - ✅ **LATEST**: Multi-layer backward compatibility supporting all previous color systems
 - ✅ **LATEST FIX**: Fixed CSS attribute selector matching issue that was limiting color variety
@@ -528,19 +563,89 @@ The plugin has been fully implemented with all requested features plus recent im
 - ✅ **CRITICAL FIX**: Resolved CSS specificity conflict causing blue color override of random colors in tabs
 - ✅ **LATEST**: Implemented maximum specificity CSS selectors to ensure random colors override all default styling
 - ✅ **FINAL FIX**: Resolved tab file lookup failure preventing random color application
-  - Fixed issue where `getAbstractFileByPath()` failed because aria-label contained display names without extensions
-  - Implemented basename search fallback to properly match tab aria-labels to actual files  
-  - Tab styling system now fully operational for both active and inactive tabs
+- ✅ **MAJOR UPDATE**: Updated all reorganization commands to work with hierarchical folder structure
+- ✅ **UPDATED**: Vault update system can migrate from old flat structure to new hierarchical structure
 
-The plugin has been built and tested successfully with all features implemented and working. The unlimited random color system now provides truly infinite color variety for root MOCs, with persistent styling across all UI elements. **The tab styling system is now fully functional** - random colors display correctly for both active and inactive root MOC tabs, resolving the final issue where colors worked in the sidebar but not in tabs.
+The plugin has been built and tested successfully with all features implemented and working. The new hierarchical folder structure provides much better organization and scalability, with each MOC having its own dedicated folder containing all its related content.
 
-**Previous Addition**: **Vault Update System** - A comprehensive modernization tool that scans the entire vault, analyzes what files need updates for the latest system requirements, shows a detailed preview of planned changes, and safely applies updates with full progress tracking and error handling. This ensures users can seamlessly upgrade their vault as the system evolves.
+**Major Architectural Change**: **Hierarchical Folder Structure** - Complete restructuring of the file organization system where each MOC (root or sub) gets its own folder containing subfolders for Notes/, Resources/, and Prompts/. This provides better navigation, cleaner organization, and improved scalability as vault size grows.
 
-**Latest Addition**: **MOC Reorganization System** - A flexible hierarchy management system that allows MOCs to be reorganized as knowledge structures evolve. Root MOCs can be moved under parents (new or existing), sub-MOCs can be promoted to root level or moved between parents, and all file operations, reference updates, and visual transitions are handled automatically. This addresses the emergent nature of knowledge organization where optimal structures become apparent over time.
+**Updated Systems**: All reorganization commands, creation methods, and the vault update system have been updated to work seamlessly with the new hierarchical structure while maintaining full backward compatibility.
+
+**Enhanced Styling**: Sub-MOCs now use the same unlimited random color and emoji system as root MOCs, providing consistent visual variety throughout the entire hierarchy.
 
 **Documentation Status**: The CLAUDE.md file has been comprehensively updated with detailed project structure, configuration details, command reference, constants documentation, and enhanced implementation details including line number references for easy navigation.
 
 ## History
+
+### Session 9 - Hierarchical Folder Structure Implementation
+**Purpose**: Implement major architectural change to use hierarchical folder structure for better organization and navigation.
+
+**User Request**: User wanted to change from the flat folder structure to a hierarchical system where:
+1. Sub-MOCs follow the same styling conventions as root MOCs (completely random colors)
+2. Each MOC is automatically placed in its own folder containing subfolders for Notes/, Resources/, Prompts/, etc.
+3. Sub-MOCs create their own folders within parent MOC folders, forming a nested hierarchy
+
+**Major Changes Implemented**:
+
+**1. File Organization Restructuring**:
+- **Old Structure**: Flat folders (MOCs/, Notes/, Resources/, Prompts/) in vault root
+- **New Structure**: Each MOC gets its own folder with subfolders for content types
+```
+🚕 Project MOC/
+├── 🚕 Project MOC.md
+├── Notes/
+├── Resources/
+├── Prompts/
+└── 🎨 Sub Project MOC/
+    ├── 🎨 Sub Project MOC.md
+    ├── Notes/
+    ├── Resources/
+    └── Prompts/
+```
+
+**2. Updated Creation Methods**:
+- `createMOC()`: Now creates folder structure for root MOCs
+- `createSubMOC()`: Creates nested folder within parent MOC folder, uses random colors
+- `createNote()`, `createResource()`, `createPrompt()`: Create files in parent MOC's subfolders
+- Added `ensureMOCFolderStructure()`: Creates complete folder hierarchy for MOCs
+
+**3. Sub-MOC Color System Update**:
+- **Before**: Sub-MOCs used fixed blue emoji (🔵) and blue color
+- **After**: Sub-MOCs use unlimited random emojis and colors (same as root MOCs)
+- Both root and sub-MOCs now have infinite visual variety
+
+**4. Reorganization Commands Update**:
+- `moveRootMOCToSub()`: Now moves entire folder structures between hierarchies
+- `promoteSubMOCToRoot()`: Moves complete sub-MOC folders to vault root
+- `moveSubMOCToNewParent()`: Moves entire folder hierarchies between parents
+- Added `updateAllFolderReferences()`: Updates file references when folders are moved
+
+**5. Vault Update System Enhancement**:
+- Added `needsFolderMigration()`: Detects files needing migration to hierarchical structure
+- Added `migrateToHierarchicalStructure()`: Migrates root MOCs to folder structure
+- Updated detection methods to handle hierarchical structure requirements
+- Migration system can upgrade from old flat structure to new hierarchical structure
+
+**6. File Detection Updates**:
+- Updated `isRootMOC()`: Now works with hierarchical structure (checks if MOC folder is at vault root)
+- Modified path handling throughout codebase to work with nested folder structures
+
+**Technical Implementation**:
+- Complete refactoring of file creation, organization, and management systems
+- Folder-based operations for all reorganization commands
+- Backward compatibility maintained for migration from old structure
+- Updated all styling and reference systems to work with new paths
+
+**User Benefits**:
+- ✅ **Better Organization**: Each MOC's content is contained in its own folder
+- ✅ **Improved Navigation**: Clearer hierarchical structure matches knowledge organization
+- ✅ **Visual Consistency**: Sub-MOCs now have same unlimited color variety as root MOCs
+- ✅ **Scalability**: Structure scales better as vault size grows
+- ✅ **Seamless Migration**: Automatic migration from old flat structure
+- ✅ **Preserved Functionality**: All existing features work with new structure
+
+**Result**: Complete architectural transformation providing much better organization and scalability while maintaining all existing functionality and visual systems.
 
 ### Session 8 - File Explorer Random Color System Fix
 **Purpose**: Fix critical bug where file explorer was displaying all MOCs in blue instead of their assigned random colors.

@@ -259,12 +259,25 @@ export default class MOCSystemPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+	// Legacy method - kept for backward compatibility but not used with new folder structure
 	async ensureFolderStructure() {
-		for (const folder of Object.values(FOLDERS)) {
-			const folderPath = normalizePath(folder);
-			if (!this.app.vault.getAbstractFileByPath(folderPath)) {
+		// No longer needed with new MOC folder structure
+		// Each MOC has its own folder structure created on demand
+	}
+	
+	// Create folder structure for a MOC
+	async ensureMOCFolderStructure(mocFolderPath: string) {
+		// Create the main MOC folder
+		if (!this.app.vault.getAbstractFileByPath(mocFolderPath)) {
+			await this.app.vault.createFolder(mocFolderPath);
+		}
+		
+		// Create subfolders for Notes, Resources, and Prompts
+		for (const folder of ['Notes', 'Resources', 'Prompts']) {
+			const subfolderPath = `${mocFolderPath}/${folder}`;
+			if (!this.app.vault.getAbstractFileByPath(subfolderPath)) {
 				try {
-					await this.app.vault.createFolder(folderPath);
+					await this.app.vault.createFolder(subfolderPath);
 				} catch (error) {
 					// Folder might have been created by another process, ignore if it already exists
 					if (!error.message?.includes('Folder already exists')) {
@@ -294,27 +307,49 @@ export default class MOCSystemPlugin extends Plugin {
 		const randomEmoji = this.getRandomEmoji();
 		const randomColor = this.generateRandomColor();
 		
-		const fileName = `${randomEmoji} ${name} MOC.md`;
+		// Create folder for the MOC
+		const mocFolderPath = `${randomEmoji} ${name} MOC`;
+		const mocFilePath = `${mocFolderPath}/${randomEmoji} ${name} MOC.md`;
+		
+		// Ensure the MOC folder and subfolders exist
+		await this.ensureMOCFolderStructure(mocFolderPath);
+		
 		const content = `---\ntags:\n  - moc\nnote-type: moc\nroot-moc-color: ${randomColor.hex}\nroot-moc-light-color: ${randomColor.lightColor}\nroot-moc-dark-color: ${randomColor.darkColor}\n---\n`;
 		
-		const file = await this.app.vault.create(fileName, content);
+		const file = await this.app.vault.create(mocFilePath, content);
 		await this.app.workspace.getLeaf().openFile(file);
 		new Notice(`Created MOC: ${name}`);
 		return file;
 	}
 
 	async createSubMOC(parentMOC: TFile, name: string): Promise<TFile> {
-		const fileName = `${FOLDERS.MOCs}/${NOTE_TYPES.MOCs.emoji} ${name} MOC.md`;
-		const content = `---\ntags:\n  - moc\nnote-type: moc\n---\n`;
+		// Get random emoji and color for sub-MOCs too
+		const randomEmoji = this.getRandomEmoji();
+		const randomColor = this.generateRandomColor();
 		
-		const file = await this.app.vault.create(normalizePath(fileName), content);
+		// Get parent MOC folder path
+		const parentFolder = parentMOC.parent?.path || '';
+		
+		// Create sub-MOC folder path
+		const subMocFolderPath = `${parentFolder}/${randomEmoji} ${name} MOC`;
+		const subMocFilePath = `${subMocFolderPath}/${randomEmoji} ${name} MOC.md`;
+		
+		// Ensure the sub-MOC folder and subfolders exist
+		await this.ensureMOCFolderStructure(subMocFolderPath);
+		
+		const content = `---\ntags:\n  - moc\nnote-type: moc\nroot-moc-color: ${randomColor.hex}\nroot-moc-light-color: ${randomColor.lightColor}\nroot-moc-dark-color: ${randomColor.darkColor}\n---\n`;
+		
+		const file = await this.app.vault.create(normalizePath(subMocFilePath), content);
 		await this.addToMOCSection(parentMOC, 'MOCs', file);
 		new Notice(`Created sub-MOC: ${name}`);
 		return file;
 	}
 
 	async createNote(parentMOC: TFile, name: string): Promise<TFile> {
-		const fileName = `${FOLDERS.Notes}/${NOTE_TYPES.Notes.emoji} ${name}.md`;
+		// Get parent MOC folder path
+		const parentFolder = parentMOC.parent?.path || '';
+		
+		const fileName = `${parentFolder}/${FOLDERS.Notes}/${NOTE_TYPES.Notes.emoji} ${name}.md`;
 		const content = `---\nnote-type: note\n---\n`;
 		
 		const file = await this.app.vault.create(normalizePath(fileName), content);
@@ -324,7 +359,10 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	async createResource(parentMOC: TFile, name: string): Promise<TFile> {
-		const fileName = `${FOLDERS.Resources}/${NOTE_TYPES.Resources.emoji} ${name}.md`;
+		// Get parent MOC folder path
+		const parentFolder = parentMOC.parent?.path || '';
+		
+		const fileName = `${parentFolder}/${FOLDERS.Resources}/${NOTE_TYPES.Resources.emoji} ${name}.md`;
 		const content = `---\nnote-type: resource\n---\n`;
 		
 		const file = await this.app.vault.create(normalizePath(fileName), content);
@@ -334,14 +372,17 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	async createPrompt(parentMOC: TFile, name: string): Promise<TFile> {
+		// Get parent MOC folder path
+		const parentFolder = parentMOC.parent?.path || '';
+		
 		// Create prompt hub
-		const hubFileName = `${FOLDERS.Prompts}/${NOTE_TYPES.Prompts.emoji} ${name}.md`;
+		const hubFileName = `${parentFolder}/${FOLDERS.Prompts}/${NOTE_TYPES.Prompts.emoji} ${name}.md`;
 		const hubContent = `---\nnote-type: prompt\n---\n\n# ${name}\n\n## Iterations\n\n- [[${NOTE_TYPES.Prompts.emoji} ${name} v1]]\n\n## LLM Links\n\n\`\`\`llm-links\n\n\`\`\`\n`;
 		
 		const hubFile = await this.app.vault.create(normalizePath(hubFileName), hubContent);
 		
 		// Create first iteration
-		const iterationFileName = `${FOLDERS.Prompts}/${NOTE_TYPES.Prompts.emoji} ${name} v1.md`;
+		const iterationFileName = `${parentFolder}/${FOLDERS.Prompts}/${NOTE_TYPES.Prompts.emoji} ${name} v1.md`;
 		const iterationContent = `---\nnote-type: prompt\n---\n`;
 		await this.app.vault.create(normalizePath(iterationFileName), iterationContent);
 		
@@ -544,11 +585,18 @@ export default class MOCSystemPlugin extends Plugin {
 		
 		const [, baseName, currentVersion] = match;
 		
-		// Find all iterations to get next available version
+		// Get the parent folder (should be a Prompts folder within a MOC folder)
+		const promptsFolder = file.parent?.path || '';
+		const mocFolder = file.parent?.parent?.path || '';
+		
+		// Find all iterations in the same folder to get next available version
 		const promptFiles = this.app.vault.getMarkdownFiles()
-			.filter(f => f.path.startsWith(FOLDERS.Prompts) && (
-				f.basename.includes(baseName) && f.basename.includes('v')
-			));
+			.filter(f => {
+				// Check if file is in the same Prompts folder
+				if (f.parent?.path !== promptsFolder) return false;
+				// Check if it's an iteration of the same prompt
+				return f.basename.includes(baseName) && f.basename.includes('v');
+			});
 		
 		let maxVersion = 0;
 		for (const pFile of promptFiles) {
@@ -566,7 +614,8 @@ export default class MOCSystemPlugin extends Plugin {
 				? `${NOTE_TYPES.Prompts.emoji} ${baseName} v${nextVersion} - ${description}`
 				: `${NOTE_TYPES.Prompts.emoji} ${baseName} v${nextVersion}`;
 			
-			const newPath = `${FOLDERS.Prompts}/${newName}.md`;
+			// Create in the same Prompts folder as the original
+			const newPath = `${promptsFolder}/${newName}.md`;
 			const originalContent = await this.app.vault.read(file);
 			// Add frontmatter if it doesn't exist
 			const content = originalContent.startsWith('---') 
@@ -575,16 +624,18 @@ export default class MOCSystemPlugin extends Plugin {
 			
 			const newFile = await this.app.vault.create(normalizePath(newPath), content);
 			
-			// Update hub file
-			await this.updatePromptHub(baseName, newFile);
+			// Update hub file (look in the same folder)
+			await this.updatePromptHub(baseName, newFile, promptsFolder);
 			
 			await this.app.workspace.getLeaf().openFile(newFile);
 			new Notice(`Created iteration: ${newName}`);
 		}).open();
 	}
 
-	async updatePromptHub(baseName: string, newIteration: TFile) {
-		const hubPath = `${FOLDERS.Prompts}/${NOTE_TYPES.Prompts.emoji} ${baseName}.md`;
+	async updatePromptHub(baseName: string, newIteration: TFile, promptsFolder?: string) {
+		// If promptsFolder is provided, use it; otherwise fall back to old global folder (for backward compatibility)
+		const folder = promptsFolder || FOLDERS.Prompts;
+		const hubPath = `${folder}/${NOTE_TYPES.Prompts.emoji} ${baseName}.md`;
 		const hubFile = this.app.vault.getAbstractFileByPath(normalizePath(hubPath));
 		
 		if (hubFile instanceof TFile) {
@@ -928,35 +979,43 @@ export default class MOCSystemPlugin extends Plugin {
 				parentMOC = await this.createMOC(parentMOCName);
 			}
 
-			// Step 2: Update MOC properties and name
-			const mocBaseName = moc.basename.replace(/^[^\s]+\s+/, '').trim(); // Remove emoji prefix
-			const newFileName = `${FOLDERS.MOCs}/${NOTE_TYPES.MOCs.emoji} ${mocBaseName}.md`;
+			// Step 2: Get MOC folder and base name
+			const mocFolder = moc.parent;
+			if (!mocFolder) throw new Error('MOC folder not found');
 			
-			// Step 3: Store the original path before any modifications
-			const originalPath = moc.path;
+			const mocBaseName = moc.basename.replace(/^[^\s]+\s+/, '').replace(/ MOC$/, '').trim(); // Remove emoji prefix and MOC suffix
 			
-			// Step 4: Update frontmatter to remove root MOC color properties
-			let content = await this.app.vault.read(moc);
-			const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
-			if (frontmatterMatch) {
-				let frontmatter = frontmatterMatch[1];
-				// Remove root MOC color properties
-				frontmatter = frontmatter.replace(/root-moc-color:.*\n/g, '');
-				frontmatter = frontmatter.replace(/root-moc-light-color:.*\n/g, '');
-				frontmatter = frontmatter.replace(/root-moc-dark-color:.*\n/g, '');
-				content = content.replace(frontmatterMatch[0], `---\n${frontmatter}\n---`);
+			// Step 3: Store the original paths
+			const originalMocPath = moc.path;
+			const originalFolderPath = mocFolder.path;
+			
+			// Step 4: Generate new sub-MOC properties (keep random color for consistency)
+			// No need to change color - sub-MOCs now use random colors too
+			
+			// Step 5: Determine new folder location (inside parent MOC folder)
+			const parentFolder = parentMOC.parent?.path || '';
+			const newFolderPath = `${parentFolder}/${mocFolder.name}`;
+			
+			// Step 6: Move entire folder structure
+			// First, ensure the parent folder exists
+			if (!this.app.vault.getAbstractFileByPath(parentFolder)) {
+				throw new Error('Parent MOC folder not found');
 			}
+			
+			// Move the folder
+			await this.app.vault.rename(mocFolder, newFolderPath);
+			
+			// Step 7: Get the moved MOC file
+			const newMocPath = `${newFolderPath}/${moc.name}`;
+			const movedMOC = this.app.vault.getAbstractFileByPath(newMocPath) as TFile;
+			
+			if (!movedMOC) throw new Error('Failed to find moved MOC');
 
-			// Step 5: Move file
-			await this.app.vault.modify(moc, content);
-			await this.app.vault.rename(moc, newFileName);
-			const movedMOC = this.app.vault.getAbstractFileByPath(newFileName) as TFile;
-
-			// Step 6: Add to parent MOC
+			// Step 8: Add to parent MOC
 			await this.addToMOCSection(parentMOC, 'MOCs', movedMOC);
 
-			// Step 7: Update all references using the original path
-			await this.updateAllReferences(originalPath, movedMOC.path);
+			// Step 9: Update all references to files in the moved folder
+			await this.updateAllFolderReferences(originalFolderPath, newFolderPath);
 
 			new Notice(`Moved ${mocBaseName} under ${parentMOC.basename}`);
 			
@@ -971,39 +1030,33 @@ export default class MOCSystemPlugin extends Plugin {
 
 	async promoteSubMOCToRoot(moc: TFile) {
 		try {
-			// Step 1: Store the original path before any modifications
-			const originalPath = moc.path;
+			// Step 1: Get MOC folder and store original paths
+			const mocFolder = moc.parent;
+			if (!mocFolder) throw new Error('MOC folder not found');
 			
-			// Step 2: Generate random emoji and color for root MOC
-			const randomEmoji = this.getRandomEmoji();
-			const randomColor = this.generateRandomColor();
+			const originalFolderPath = mocFolder.path;
+			const mocBaseName = moc.basename.replace(/^[^\s]+\s+/, '').replace(/ MOC$/, '').trim();
 			
-			// Step 3: Extract base name and create new filename
-			const mocBaseName = moc.basename.replace(/^[^\s]+\s+/, '').trim(); // Remove emoji prefix
-			const newFileName = `${randomEmoji} ${mocBaseName}.md`;
+			// Step 2: The MOC already has random emoji and color (from new system)
+			// Just need to move folder to root
 			
-			// Step 4: Update frontmatter to add root MOC color properties
-			let content = await this.app.vault.read(moc);
-			const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
-			if (frontmatterMatch) {
-				let frontmatter = frontmatterMatch[1];
-				// Add root MOC color properties
-				frontmatter += `\nroot-moc-color: ${randomColor.hex}`;
-				frontmatter += `\nroot-moc-light-color: ${randomColor.lightColor}`;
-				frontmatter += `\nroot-moc-dark-color: ${randomColor.darkColor}`;
-				content = content.replace(frontmatterMatch[0], `---\n${frontmatter}\n---`);
-			}
-
-			// Step 5: Move file to root
-			await this.app.vault.modify(moc, content);
-			await this.app.vault.rename(moc, newFileName);
-			const movedMOC = this.app.vault.getAbstractFileByPath(newFileName) as TFile;
+			// Step 3: Determine new folder location (vault root)
+			const newFolderPath = mocFolder.name; // Same folder name, but at root
+			
+			// Step 4: Move entire folder structure to root
+			await this.app.vault.rename(mocFolder, newFolderPath);
+			
+			// Step 5: Get the moved MOC file
+			const newMocPath = `${newFolderPath}/${moc.name}`;
+			const movedMOC = this.app.vault.getAbstractFileByPath(newMocPath) as TFile;
+			
+			if (!movedMOC) throw new Error('Failed to find moved MOC');
 
 			// Step 6: Remove from parent MOC(s)
 			await this.removeFromParentMOCs(moc);
 
-			// Step 7: Update all references using the original path
-			await this.updateAllReferences(originalPath, movedMOC.path);
+			// Step 7: Update all references to files in the moved folder
+			await this.updateAllFolderReferences(originalFolderPath, newFolderPath);
 
 			new Notice(`Promoted ${mocBaseName} to root MOC`);
 			
@@ -1018,11 +1071,33 @@ export default class MOCSystemPlugin extends Plugin {
 
 	async moveSubMOCToNewParent(moc: TFile, newParent: TFile) {
 		try {
-			// Step 1: Remove from current parent(s)
+			// Step 1: Get MOC folder
+			const mocFolder = moc.parent;
+			if (!mocFolder) throw new Error('MOC folder not found');
+			
+			const originalFolderPath = mocFolder.path;
+			
+			// Step 2: Remove from current parent(s)
 			await this.removeFromParentMOCs(moc);
 
-			// Step 2: Add to new parent
-			await this.addToMOCSection(newParent, 'MOCs', moc);
+			// Step 3: Determine new folder location (inside new parent MOC folder)
+			const newParentFolder = newParent.parent?.path || '';
+			const newFolderPath = `${newParentFolder}/${mocFolder.name}`;
+			
+			// Step 4: Move entire folder structure
+			await this.app.vault.rename(mocFolder, newFolderPath);
+			
+			// Step 5: Get the moved MOC file
+			const newMocPath = `${newFolderPath}/${moc.name}`;
+			const movedMOC = this.app.vault.getAbstractFileByPath(newMocPath) as TFile;
+			
+			if (!movedMOC) throw new Error('Failed to find moved MOC');
+
+			// Step 6: Add to new parent
+			await this.addToMOCSection(newParent, 'MOCs', movedMOC);
+			
+			// Step 7: Update all references to files in the moved folder
+			await this.updateAllFolderReferences(originalFolderPath, newFolderPath);
 
 			new Notice(`Moved ${moc.basename} to ${newParent.basename}`);
 			
@@ -1050,6 +1125,48 @@ export default class MOCSystemPlugin extends Plugin {
 				const newContent = content.replace(linkPattern, '');
 				const cleanedContent = this.cleanupOrphanedBlankLines(newContent.split('\n'), parentMOC).join('\n');
 				await this.app.vault.modify(parentMOC, cleanedContent);
+			}
+		}
+	}
+
+	async updateAllFolderReferences(oldFolderPath: string, newFolderPath: string) {
+		// Update references for all files that were moved with the folder
+		const allFiles = this.app.vault.getMarkdownFiles();
+		
+		for (const file of allFiles) {
+			let content = await this.app.vault.read(file);
+			let modified = false;
+			
+			// Find all links in the file
+			const linkRegex = /\[\[([^\]]+)\]\]/g;
+			let newContent = content;
+			
+			let match;
+			while ((match = linkRegex.exec(content)) !== null) {
+				const linkedName = match[1];
+				
+				// Check if this link might reference a file in the moved folder
+				const possibleOldPaths = [
+					`${oldFolderPath}/${linkedName}.md`,
+					`${oldFolderPath}/${linkedName}`,
+					`${oldFolderPath}/Notes/${linkedName}.md`,
+					`${oldFolderPath}/Resources/${linkedName}.md`,
+					`${oldFolderPath}/Prompts/${linkedName}.md`
+				];
+				
+				for (const oldPath of possibleOldPaths) {
+					const newPath = oldPath.replace(oldFolderPath, newFolderPath);
+					if (this.app.vault.getAbstractFileByPath(newPath)) {
+						// Update the link if we find a matching file in the new location
+						// Keep just the basename in the link
+						modified = true;
+						break;
+					}
+				}
+			}
+			
+			if (modified) {
+				await this.app.vault.modify(file, newContent);
 			}
 		}
 	}
@@ -1181,6 +1298,11 @@ export default class MOCSystemPlugin extends Plugin {
 			}
 		}
 
+		// Check if file needs to be migrated to new folder structure
+		if (this.needsFolderMigration(file)) {
+			updates.push('Migrate to new hierarchical folder structure');
+		}
+
 		// Check file type specific requirements
 		if (this.isMOC(file)) {
 			if (this.isRootMOC(file)) {
@@ -1188,22 +1310,45 @@ export default class MOCSystemPlugin extends Plugin {
 			} else {
 				updates.push(...await this.checkSubMOCRequirements(file));
 			}
-		} else if (file.path.startsWith(FOLDERS.Notes)) {
+		} else if (noteType === 'note' || file.path.includes('/Notes/')) {
 			updates.push(...await this.checkNoteRequirements(file));
-		} else if (file.path.startsWith(FOLDERS.Resources)) {
+		} else if (noteType === 'resource' || file.path.includes('/Resources/')) {
 			updates.push(...await this.checkResourceRequirements(file));
-		} else if (file.path.startsWith(FOLDERS.Prompts)) {
+		} else if (noteType === 'prompt' || file.path.includes('/Prompts/')) {
 			updates.push(...await this.checkPromptRequirements(file));
 		}
 
 		return updates;
 	}
 
+	private needsFolderMigration(file: TFile): boolean {
+		// Check if file is in old flat structure and needs migration
+		const path = file.path;
+		const cache = this.app.metadataCache.getFileCache(file);
+		const noteType = cache?.frontmatter?.['note-type'];
+		
+		// Root MOCs in root without folder
+		if (this.isMOC(file) && this.isRootMOC(file) && !file.parent) {
+			return true;
+		}
+		
+		// Files in old global folders
+		if (path.startsWith(FOLDERS.MOCs + '/') || 
+			path.startsWith(FOLDERS.Notes + '/') || 
+			path.startsWith(FOLDERS.Resources + '/') || 
+			path.startsWith(FOLDERS.Prompts + '/')) {
+			// These are in the old flat structure
+			return true;
+		}
+		
+		return false;
+	}
+
 	private detectFileType(file: TFile): string | null {
 		if (this.isMOC(file)) return 'moc';
-		if (file.path.startsWith(FOLDERS.Notes)) return 'note';
-		if (file.path.startsWith(FOLDERS.Resources)) return 'resource';
-		if (file.path.startsWith(FOLDERS.Prompts)) return 'prompt';
+		if (file.path.startsWith(FOLDERS.Notes) || file.path.includes('/Notes/')) return 'note';
+		if (file.path.startsWith(FOLDERS.Resources) || file.path.includes('/Resources/')) return 'resource';
+		if (file.path.startsWith(FOLDERS.Prompts) || file.path.includes('/Prompts/')) return 'prompt';
 		return null;
 	}
 
@@ -1236,15 +1381,33 @@ export default class MOCSystemPlugin extends Plugin {
 
 	private async checkSubMOCRequirements(file: TFile): Promise<string[]> {
 		const updates: string[] = [];
+		const cache = this.app.metadataCache.getFileCache(file);
 		
-		// Check location
-		if (!file.path.startsWith(FOLDERS.MOCs + '/')) {
-			updates.push(`Move to ${FOLDERS.MOCs} folder`);
+		// Check if it's in the new hierarchical structure
+		// Sub-MOCs should be in a folder within another MOC folder
+		const isInHierarchicalStructure = file.path.includes('/') && 
+			!file.path.startsWith(FOLDERS.MOCs + '/') && 
+			!file.path.startsWith(FOLDERS.Notes + '/') && 
+			!file.path.startsWith(FOLDERS.Resources + '/') && 
+			!file.path.startsWith(FOLDERS.Prompts + '/');
+		
+		if (!isInHierarchicalStructure && file.path.startsWith(FOLDERS.MOCs + '/')) {
+			updates.push('Migrate to hierarchical folder structure');
 		}
 		
-		// Check emoji prefix
-		if (!file.basename.startsWith(NOTE_TYPES.MOCs.emoji)) {
-			updates.push(`Add ${NOTE_TYPES.MOCs.emoji} emoji prefix`);
+		// Check random color system (sub-MOCs now use random colors too)
+		const hasRandomColor = cache?.frontmatter?.['root-moc-color'] && 
+			cache?.frontmatter?.['root-moc-light-color'] && 
+			cache?.frontmatter?.['root-moc-dark-color'];
+		
+		if (!hasRandomColor) {
+			updates.push('Add random color system to frontmatter');
+		}
+		
+		// Check emoji prefix (should be random emoji, not blue circle)
+		const hasRandomEmojiPrefix = /^[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(file.basename);
+		if (!hasRandomEmojiPrefix) {
+			updates.push('Update to random emoji prefix');
 		}
 		
 		// Check MOC suffix
@@ -1330,6 +1493,10 @@ export default class MOCSystemPlugin extends Plugin {
 				} else if (update.includes('random color system')) {
 					await this.addRandomColorSystem(file);
 					changes.push('Added random color system');
+				} else if (update.includes('folder structure') || update.includes('hierarchical')) {
+					newFile = await this.migrateToHierarchicalStructure(newFile);
+					fileRenamed = true;
+					changes.push('Migrated to new hierarchical folder structure');
 				} else if (update.includes('emoji prefix') || update.includes('MOC suffix')) {
 					newFile = await this.updateFileName(newFile, update);
 					fileRenamed = true;
@@ -1392,6 +1559,47 @@ export default class MOCSystemPlugin extends Plugin {
 			);
 			await this.app.vault.modify(file, lines.join('\n'));
 		}
+	}
+
+	private async migrateToHierarchicalStructure(file: TFile): Promise<TFile> {
+		const cache = this.app.metadataCache.getFileCache(file);
+		const noteType = cache?.frontmatter?.['note-type'];
+		
+		if (this.isMOC(file)) {
+			if (this.isRootMOC(file)) {
+				// Root MOC: Create folder structure for it
+				// Keep existing emoji if it has one, otherwise add one
+				let fileName = file.basename;
+				if (!/^[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(fileName)) {
+					const randomEmoji = this.getRandomEmoji();
+					const baseName = fileName.replace(/ MOC$/, '').trim();
+					fileName = `${randomEmoji} ${baseName} MOC`;
+				}
+				
+				const folderName = fileName.replace('.md', '');
+				const newPath = `${folderName}/${fileName}`;
+				
+				// Create folder structure
+				await this.ensureMOCFolderStructure(folderName);
+				
+				// Move file
+				await this.app.vault.rename(file, newPath);
+				return this.app.vault.getAbstractFileByPath(newPath) as TFile;
+			} else {
+				// Sub-MOC: Move to hierarchical location
+				// For now, keep in root until user reorganizes manually
+				// This is complex because we need to determine which MOC it belongs to
+				return file;
+			}
+		} else if (noteType === 'note' || noteType === 'resource' || noteType === 'prompt') {
+			// These files need to be assigned to a MOC
+			// For migration, we can't automatically determine which MOC they belong to
+			// Users will need to manually move them or reorganize
+			console.log(`File ${file.path} needs manual assignment to a MOC`);
+			return file;
+		}
+		
+		return file;
 	}
 
 	private async updateFileName(file: TFile, update: string): Promise<TFile> {
@@ -1998,7 +2206,16 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	isRootMOC(file: TFile): boolean {
-		return this.isMOC(file) && !file.path.includes('/');
+		// With new folder structure, root MOCs are those in folders at the vault root
+		// Check if the MOC's parent folder is in the vault root (no other MOC folders in path)
+		if (!this.isMOC(file)) return false;
+		
+		// Get the folder path (parent of the MOC file)
+		const folderPath = file.parent?.path || '';
+		
+		// Root MOCs have their folder directly in the vault root (no '/' in folder path)
+		// Or the file itself is in the root (legacy support)
+		return !folderPath.includes('/') || file.path.split('/').length === 1;
 	}
 }
 
