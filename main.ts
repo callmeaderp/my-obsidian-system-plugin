@@ -1671,11 +1671,21 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	isPromptIteration(file: TFile): boolean {
-		return file.path.startsWith(FOLDERS.Prompts) && /v\d+/.test(file.basename);
+		// Check if file is in a Prompts folder (hierarchical structure)
+		const isInPromptsFolder = file.parent?.name === FOLDERS.Prompts;
+		return isInPromptsFolder && /v\d+/.test(file.basename);
 	}
 
 	isPromptHub(file: TFile): boolean {
-		return file.path.startsWith(FOLDERS.Prompts) && !this.isPromptIteration(file);
+		// Check if file is in a Prompts folder (hierarchical structure)
+		const isInPromptsFolder = file.parent?.name === FOLDERS.Prompts;
+		// Check for note-type metadata as primary indicator
+		const noteType = this.getNoteType(file);
+		if (noteType === 'prompt') {
+			return isInPromptsFolder && !this.isPromptIteration(file);
+		}
+		// Fallback: check if in Prompts folder and not an iteration
+		return isInPromptsFolder && !this.isPromptIteration(file);
 	}
 
 	getNoteType(file: TFile): string | null {

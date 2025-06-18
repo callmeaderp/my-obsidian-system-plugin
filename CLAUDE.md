@@ -172,8 +172,8 @@ export default class MOCSystemPlugin extends Plugin {
 ### File Detection Methods
 - `isMOC()`: Checks for `#moc` tag in frontmatter
 - `isRootMOC()`: Updated to work with hierarchical structure - determines if MOC folder is at vault root
-- `isPromptIteration()`: Detects files with version pattern (v1, v2, etc.)
-- `isPromptHub()`: Identifies prompt files that aren't iterations
+- `isPromptIteration()`: Detects files with version pattern (v1, v2, etc.) in Prompts folders - checks parent folder name instead of path
+- `isPromptHub()`: Identifies prompt files that aren't iterations - uses parent folder name and note-type metadata for hierarchical structure compatibility
 
 ### Interface Definitions
 
@@ -319,3 +319,11 @@ The plugin implements comprehensive event handling for real-time UI updates:
 
 ### Latest Major Change
 **Hierarchical Folder Structure**: Complete transformation from flat folder system to nested hierarchy where each MOC has its own folder containing Notes/, Resources/, and Prompts/ subfolders. Sub-MOCs nest within parent folders, creating intuitive organization that scales with vault growth.
+
+## Running Issue Log
+
+### Duplicate Prompt Iteration Command (2025-06-18)
+**Issue**: "Duplicate Prompt Iteration" hotkey stopped working after hierarchical folder structure implementation.
+**Root Cause**: `isPromptIteration()` and `isPromptHub()` methods were still using old flat folder logic, checking if file paths started with "Prompts" folder.
+**Fix**: Updated both methods to check if the file's parent folder name equals "Prompts" instead of checking the full path. This correctly identifies prompt files within the hierarchical structure where prompts are in nested folders like `MOCName/Prompts/...`.
+**Resolution**: Changed from `file.path.startsWith(FOLDERS.Prompts)` to `file.parent?.name === FOLDERS.Prompts` in both methods.
