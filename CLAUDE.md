@@ -13,7 +13,6 @@ Custom Obsidian plugin for automating a MOC (Map of Content) based note-taking s
 
 ### Core Files
 - **`main.ts`** - Main plugin implementation (all logic, modals, functionality)
-- **`styles.css`** - Note type styling and color theming
 - **`manifest.json`** - Plugin metadata and compatibility
 - **`package.json`** - Dependencies and build scripts
 - **Other**: TypeScript config, build config, documentation files
@@ -346,3 +345,9 @@ The plugin implements comprehensive event handling for real-time UI updates:
 - Kept only essential commands: context creation, prompt iteration, LLM links, cleanup
 - Simplified all creation methods to use direct input parsing ("note Name", "prompt Helper", "sub Project")
 **Result**: Dramatically cleaner codebase focused purely on the core MOC workflow, easier maintenance, and faster performance.
+
+### Unused styles.css File Cleanup (2025-06-19)
+**Issue**: Discovered leftover styles.css file in project directory that wasn't being used by the plugin.
+**Root Cause**: File remained from earlier debugging/development phase but wasn't referenced or needed in the lean rewrite implementation.
+**Fix**: Removed unused styles.css file and updated CLAUDE.md to reflect removal from Core Files section.
+**Resolution**: File deleted and documentation updated to maintain accurate project structure documentation.
