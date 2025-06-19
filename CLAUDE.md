@@ -327,3 +327,15 @@ The plugin implements comprehensive event handling for real-time UI updates:
 **Root Cause**: `isPromptIteration()` and `isPromptHub()` methods were still using old flat folder logic, checking if file paths started with "Prompts" folder.
 **Fix**: Updated both methods to check if the file's parent folder name equals "Prompts" instead of checking the full path. This correctly identifies prompt files within the hierarchical structure where prompts are in nested folders like `MOCName/Prompts/...`.
 **Resolution**: Changed from `file.path.startsWith(FOLDERS.Prompts)` to `file.parent?.name === FOLDERS.Prompts` in both methods.
+
+### ESLint Code Quality Issues (2025-06-19)
+**Issue**: Multiple ESLint errors in main.ts causing potential runtime issues and code quality problems.
+**Root Cause**: Accumulation of 17 different ESLint violations including unused variables, unsafe non-null assertions, mixed indentation, and other code quality issues.
+**Fix**: Comprehensive cleanup of all ESLint errors:
+- Removed unused imports (`MarkdownView`) and variables (`currentVersion`, `mocFolder`, `originalMocPath`, `noteType`, `fileRenamed`)
+- Changed empty interface to type alias (`interface PluginSettings {}` → `type PluginSettings = Record<string, never>`)
+- Fixed mixed spaces/tabs indentation inconsistencies
+- Changed `let` to `const` for variables that are never reassigned
+- Added Unicode flag to regex pattern for proper emoji handling
+- Replaced unsafe non-null assertions with proper null checks
+**Resolution**: All 17 ESLint errors resolved, improving code stability and maintainability.

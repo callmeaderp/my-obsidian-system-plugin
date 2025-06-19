@@ -1,12 +1,8 @@
-import { App, Modal, Notice, Plugin, TFile, TFolder, normalizePath, MarkdownView } from 'obsidian';
+import { App, Modal, Notice, Plugin, TFile, TFolder, normalizePath } from 'obsidian';
 
-interface PluginSettings {
-	
-}
+type PluginSettings = Record<string, never>;
 
-const DEFAULT_SETTINGS: PluginSettings = {
-	
-}
+const DEFAULT_SETTINGS: PluginSettings = {}
 
 const FOLDERS = {
 	MOCs: 'MOCs',
@@ -426,7 +422,10 @@ export default class MOCSystemPlugin extends Plugin {
 			const currentSectionIndex = SECTION_ORDER.indexOf(section);
 			for (let i = currentSectionIndex + 1; i < SECTION_ORDER.length; i++) {
 				if (sectionIndices.has(SECTION_ORDER[i])) {
-					insertIndex = sectionIndices.get(SECTION_ORDER[i])!;
+					const sectionIndex = sectionIndices.get(SECTION_ORDER[i]);
+				if (sectionIndex !== undefined) {
+					insertIndex = sectionIndex;
+				}
 					break;
 				}
 			}
@@ -583,11 +582,10 @@ export default class MOCSystemPlugin extends Plugin {
 		const match = file.basename.match(/^(?:🤖\s+)?(.+?)\s*v(\d+)(?:\s*-\s*(.+))?$/);
 		if (!match) return;
 		
-		const [, baseName, currentVersion] = match;
+		const [, baseName] = match;
 		
 		// Get the parent folder (should be a Prompts folder within a MOC folder)
 		const promptsFolder = file.parent?.path || '';
-		const mocFolder = file.parent?.parent?.path || '';
 		
 		// Find all iterations in the same folder to get next available version
 		const promptFiles = this.app.vault.getMarkdownFiles()
@@ -655,8 +653,8 @@ export default class MOCSystemPlugin extends Plugin {
 				// Find where to insert
 				let insertIndex = iterIndex + 1;
 				while (insertIndex < lines.length && 
-					   !lines[insertIndex].startsWith('## ') && 
-					   lines[insertIndex].trim() !== '') {
+					!lines[insertIndex].startsWith('## ') && 
+					lines[insertIndex].trim() !== '') {
 					insertIndex++;
 				}
 				
@@ -986,7 +984,6 @@ export default class MOCSystemPlugin extends Plugin {
 			const mocBaseName = moc.basename.replace(/^[^\s]+\s+/, '').replace(/ MOC$/, '').trim(); // Remove emoji prefix and MOC suffix
 			
 			// Step 3: Store the original paths
-			const originalMocPath = moc.path;
 			const originalFolderPath = mocFolder.path;
 			
 			// Step 4: Generate new sub-MOC properties (keep random color for consistency)
@@ -1134,12 +1131,12 @@ export default class MOCSystemPlugin extends Plugin {
 		const allFiles = this.app.vault.getMarkdownFiles();
 		
 		for (const file of allFiles) {
-			let content = await this.app.vault.read(file);
+			const content = await this.app.vault.read(file);
 			let modified = false;
 			
 			// Find all links in the file
 			const linkRegex = /\[\[([^\]]+)\]\]/g;
-			let newContent = content;
+			const newContent = content;
 			
 			let match;
 			while ((match = linkRegex.exec(content)) !== null) {
@@ -1197,7 +1194,8 @@ export default class MOCSystemPlugin extends Plugin {
 		const queue = [moc.path];
 		
 		while (queue.length > 0) {
-			const currentPath = queue.shift()!;
+			const currentPath = queue.shift();
+			if (!currentPath) continue;
 			if (visited.has(currentPath)) continue;
 			visited.add(currentPath);
 			
@@ -1324,8 +1322,6 @@ export default class MOCSystemPlugin extends Plugin {
 	private needsFolderMigration(file: TFile): boolean {
 		// Check if file is in old flat structure and needs migration
 		const path = file.path;
-		const cache = this.app.metadataCache.getFileCache(file);
-		const noteType = cache?.frontmatter?.['note-type'];
 		
 		// Root MOCs in root without folder
 		if (this.isMOC(file) && this.isRootMOC(file) && !file.parent) {
@@ -1499,11 +1495,9 @@ export default class MOCSystemPlugin extends Plugin {
 					changes.push('Migrated to new hierarchical folder structure');
 				} else if (update.includes('emoji prefix') || update.includes('MOC suffix')) {
 					newFile = await this.updateFileName(newFile, update);
-					fileRenamed = true;
 					changes.push(`Updated filename: ${update}`);
 				} else if (update.includes('Move to')) {
 					newFile = await this.moveFileToCorrectLocation(newFile, update);
-					fileRenamed = true;
 					changes.push(`Moved file: ${update}`);
 				} else if (update.includes('prompt hub structure')) {
 					await this.updatePromptHubStructure(newFile);
@@ -2150,7 +2144,7 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 		
 		// Backward compatibility: check if the file has one of the old colored emojis
-		const existingColorMatch = file.basename.match(/^([🔴🟠🟡🟢🔵🟣🟤⚫🔺])\s+/);
+		const existingColorMatch = file.basename.match(/^([🔴🟠🟡🟢🔵🟣🟤⚫🔺])\s+/u);
 		if (existingColorMatch) {
 			const emoji = existingColorMatch[1];
 			const colorName = LEGACY_EMOJI_TO_COLOR[emoji];
@@ -2191,9 +2185,9 @@ export default class MOCSystemPlugin extends Plugin {
 	private generateHashBasedColor(hash: number): { lightColor: string, darkColor: string, name: string } {
 		// Better hash-based color generation with improved distribution
 		// Use multiple hash transformations to spread colors across spectrum
-		let h1 = hash;
-		let h2 = hash * 0x9e3779b9; // Golden ratio multiplier for better distribution
-		let h3 = hash ^ (hash >>> 16); // XOR with shifted bits
+		const h1 = hash;
+		const h2 = hash * 0x9e3779b9; // Golden ratio multiplier for better distribution
+		const h3 = hash ^ (hash >>> 16); // XOR with shifted bits
 		
 		// Extract RGB components with better mixing
 		const r = Math.max(64, Math.min(224, ((h1 >>> 0) & 0xFF)));
