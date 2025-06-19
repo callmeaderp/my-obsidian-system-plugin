@@ -46,13 +46,11 @@ MOCs use `#moc` frontmatter tag and display only populated sections in order: MO
 
 ## Features
 
-### Commands
+### Commands (Lean Core Set)
 1. **Create MOC or add content** - Context-aware creation (root MOC vs sub-items)
-2. **Reorganize MOC** - Move MOCs between root/sub levels with automatic updates
-3. **Duplicate prompt iteration** - Version control for prompt iterations
-4. **Open all LLM links** - Batch open URLs from prompt hub
-5. **Cleanup MOC system files** - Safe removal of plugin-created files
-6. **Update vault to latest system** - Modernize vault to latest requirements
+2. **Duplicate prompt iteration** - Version control for prompt iterations  
+3. **Open all LLM links** - Batch open URLs from prompt hub
+4. **Cleanup MOC system files** - Safe removal of plugin-created files
 
 ### Core Systems
 - **Unlimited Random System**: Random Unicode emojis + RGB colors for MOCs
@@ -62,16 +60,11 @@ MOCs use `#moc` frontmatter tag and display only populated sections in order: MO
 
 ## Command Reference
 
-### Primary Commands (6)
+### Primary Commands (4)
 - `moc-context-create` - Context-aware creation
 - `duplicate-prompt-iteration` - Version prompts
-- `reorganize-moc` - Move MOCs in hierarchy
 - `open-llm-links` - Open prompt URLs
 - `cleanup-moc-system` - Remove plugin files
-- `update-vault-system` - Modernize vault
-
-### Development Command
-- `test-random-system` - Test color/emoji generation
 
 ## Key Constants
 - **Folders**: MOCs, Notes, Resources, Prompts
@@ -284,16 +277,15 @@ The plugin implements comprehensive event handling for real-time UI updates:
 
 ## Current Status
 
-**Fully Implemented** - All features complete and tested:
+**Lean Core Implementation** - Streamlined to essential features:
+- Context-aware creation (root MOC, sub-MOC, note, resource, prompt)
 - Hierarchical folder structure (each MOC has own folder)
-- Context-aware creation and reorganization
 - Unlimited random colors/emojis for all MOCs
-- Prompt versioning with LLM link management
-- Automatic maintenance and cleanup
-- Vault modernization system
-- Full backward compatibility
+- Prompt iteration duplication with hub auto-update
+- LLM links batch opening
+- System cleanup (delete all plugin files)
 
-**Key Achievement**: Complete architectural transformation to hierarchical structure with seamless migration support and enhanced visual system.
+**Key Achievement**: Major code reduction from ~2800 lines to ~220 lines while retaining all core functionality. Removed legacy systems, complex modals, reorganization features, and vault update system to focus on essential workflow.
 
 ## History
 
@@ -317,8 +309,10 @@ The plugin implements comprehensive event handling for real-time UI updates:
 
 9. **Hierarchical Folder Structure** - Major architectural change where each MOC gets its own folder with subfolders, providing better organization and scalability
 
+10. **Lean Rewrite** - Massive code reduction from ~2800 lines to ~220 lines, removing legacy systems, complex modals, reorganization features, and vault update system while retaining all core functionality
+
 ### Latest Major Change
-**Hierarchical Folder Structure**: Complete transformation from flat folder system to nested hierarchy where each MOC has its own folder containing Notes/, Resources/, and Prompts/ subfolders. Sub-MOCs nest within parent folders, creating intuitive organization that scales with vault growth.
+**Lean Rewrite (2025-06-19)**: Complete code streamlining that reduced the plugin from ~2800 lines to ~220 lines. Removed all legacy compatibility code, complex modal systems, MOC reorganization features, and vault update systems. Retained only the essential workflow: context-aware creation, prompt iteration management, LLM link handling, and cleanup. Plugin now uses a single streamlined modal for all input and focuses purely on the core MOC workflow.
 
 ## Running Issue Log
 
@@ -339,3 +333,16 @@ The plugin implements comprehensive event handling for real-time UI updates:
 - Added Unicode flag to regex pattern for proper emoji handling
 - Replaced unsafe non-null assertions with proper null checks
 **Resolution**: All 17 ESLint errors resolved, improving code stability and maintainability.
+
+### Lean Rewrite Implementation (2025-06-19)
+**Issue**: Plugin had grown to ~2800 lines with extensive legacy support, complex modal systems, and features that were rarely used.
+**Decision**: Major code reduction focusing on core workflow only.
+**Implementation**: Complete rewrite reducing codebase to ~220 lines:
+- Removed all legacy compatibility systems (hash-based colors, old folder structures)
+- Eliminated complex modal chains in favor of single InputModal
+- Removed MOC reorganization features (moving between root/sub levels)
+- Removed vault update system (automatic modernization)
+- Removed event handling for UI updates and styling
+- Kept only essential commands: context creation, prompt iteration, LLM links, cleanup
+- Simplified all creation methods to use direct input parsing ("note Name", "prompt Helper", "sub Project")
+**Result**: Dramatically cleaner codebase focused purely on the core MOC workflow, easier maintenance, and faster performance.
