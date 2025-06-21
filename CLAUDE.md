@@ -45,24 +45,30 @@ MOCs use `#moc` frontmatter tag and display only populated sections in order: MO
 
 ## Features
 
-### Commands (Lean Core Set)
+### Commands (Full Feature Set)
 1. **Create MOC or add content** - Context-aware creation (root MOC vs sub-items)
-2. **Duplicate prompt iteration** - Version control for prompt iterations  
-3. **Open all LLM links** - Batch open URLs from prompt hub
-4. **Cleanup MOC system files** - Safe removal of plugin-created files
+2. **Reorganize MOC** - Move MOCs between root/sub levels and different parents
+3. **Duplicate prompt iteration** - Version control for prompt iterations  
+4. **Open all LLM links** - Batch open URLs from prompt hub
+5. **Update vault to latest system** - Automated modernization of existing files
+6. **Cleanup MOC system files** - Safe removal of plugin-created files
 
 ### Core Systems
-- **Random Generation**: Random Unicode emojis for MOCs
+- **Random Generation**: Random Unicode emojis and RGB colors for MOCs
 - **Type Identification**: Fixed emoji prefixes for each file type
-- **Single Input Modal**: Unified creation interface with input parsing
+- **Modal System**: Multiple specialized modals for different operations
 - **Hierarchical Organization**: Each MOC gets its own folder with subfolders
+- **Reorganization Engine**: Full MOC hierarchy management with circular dependency detection
+- **Vault Modernization**: Automated updates for legacy file structures
 
 ## Command Reference
 
-### Primary Commands (4)
+### Primary Commands (6)
 - `moc-context-create` - Context-aware creation
+- `reorganize-moc` - Move/promote/demote MOCs
 - `duplicate-prompt-iteration` - Version prompts
 - `open-llm-links` - Open prompt URLs
+- `update-vault-system` - Modernize vault files
 - `cleanup-moc-system` - Remove plugin files
 
 ## Key Constants
@@ -83,69 +89,125 @@ export default class MOCSystemPlugin extends Plugin {
 }
 ```
 
-### Key Methods (Lean Implementation)
+### Key Methods (Full Implementation)
 
-#### Core Methods
-- `contextCreate()`: Single entry point that determines context and shows appropriate input modal
-- `createRootMOC()`: Creates top-level MOC with folder structure and random emoji
-- `createSubMOC()`: Creates sub-MOC within parent folder with input parsing
-- `createTyped()`: Generic creation for notes, resources, and prompts based on type
-- `addToSection()`: Adds links to appropriate MOC sections with auto-creation
+#### Core Creation Methods
+- `handleContextCreate()`: Main entry point for context-aware creation
+- `createMOC()`: Creates root MOC with folder structure and random properties
+- `createSubMOC()`: Creates sub-MOC within parent folder
+- `createNote()`: Creates note in MOC's Notes subfolder
+- `createResource()`: Creates resource in MOC's Resources subfolder
+- `createPrompt()`: Creates prompt hub and first iteration
+- `ensureMOCFolderStructure()`: Creates complete folder hierarchy
 
-#### Prompt Methods
-- `duplicateIteration()`: Creates new version with incremented number
-- `openLLMLinks()`: Extracts and opens all URLs from llm-links block
-- `isPromptIteration()`: Checks if file is a versioned prompt
-- `isPromptHub()`: Checks if file is a prompt hub (non-versioned)
+#### MOC Section Management
+- `addToMOCSection()`: Adds links to appropriate MOC sections
+- `reorganizeContentForPluginSections()`: Reorders MOC content sections
+- `findSectionEnd()`: Locates section boundaries in markdown
 
-#### Utilities
-- `cleanup()`: Deletes all plugin files based on note-type metadata
-- `isMOC()`: Checks for #moc tag in frontmatter
-- `withActive()`: Helper for command callbacks with active file
-- `ensureFolder()`: Creates folder if it doesn't exist
-- `sectionEnd()`: Finds where a section ends in the file
+#### Prompt Management
+- `duplicatePromptIteration()`: Creates new versioned iteration
+- `updatePromptHub()`: Updates hub with new iteration links
+- `openLLMLinks()`: Opens all URLs from llm-links code blocks
 
-#### Input System
-- **Single Modal**: All creation uses one `InputModal` class
-- **Input Parsing**: "note Name", "resource Spec", "prompt AI", "sub Project"
-- **Context Aware**: Different behavior based on active file (MOC vs non-MOC)
-- **Validation**: Basic trim and empty checks
+#### MOC Reorganization System
+- `reorganizeMOC()`: Initiates reorganization workflow
+- `moveRootMOCToSub()`: Converts root MOC to sub-MOC
+- `promoteSubMOCToRoot()`: Promotes sub-MOC to root level
+- `moveSubMOCToNewParent()`: Moves sub-MOC between parents
+- `removeFromParentMOCs()`: Removes MOC links from parent files
+- `detectCircularDependency()`: Prevents invalid MOC relationships
 
-### Random Generation
-- `randomRGB()`: Generates random color with hex and light variants
-- `randomEmoji()`: Picks from 6 Unicode blocks for variety
+#### Vault Update & Maintenance
+- `updateVaultToLatestSystem()`: Initiates vault modernization
+- `analyzeVaultForUpdates()`: Scans vault for needed updates
+- `detectRequiredUpdates()`: Identifies specific file updates needed
+- `executeUpdatePlan()`: Applies all planned updates
+- `updateFile()`: Applies specific updates to individual files
+- `migrateToHierarchicalStructure()`: Moves files to new structure
+- `updateFileName()`: Adds required prefixes/suffixes
+- `cleanupMOCSystem()`: Removes all plugin files
+- `cleanupBrokenLinks()`: Removes broken links after file deletion
 
-### Modal Dialog
+#### Helper & Utility Methods
+- `isMOC()`: Checks for MOC frontmatter tag
+- `isRootMOC()`: Determines if MOC is at root level
+- `isPromptIteration()`: Identifies versioned prompt files
+- `isPromptHub()`: Identifies non-versioned prompt files
+- `needsFolderMigration()`: Checks if file needs structure update
+- `detectFileType()`: Determines file type from path/name
+- `getAllMOCs()`: Returns all MOC files in vault
 
-The plugin uses a single modal class:
+### Random Generation System
+- `generateRandomColor()`: Creates RGB color with light/dark variants
+- `getRandomEmoji()`: Selects from 4 Unicode emoji ranges
 
-#### InputModal (lines 79-95)
-- **Purpose**: Generic text input for all creation operations
-- **Features**: Dynamic title/placeholder, Enter key support, validation
-- **Usage**: Used for MOC names and parsed input ("note X", "sub Y", etc.)
+### Modal System
 
-## Technical Decisions (Lean Rewrite)
+The plugin uses multiple specialized modal classes:
 
-1. **Extreme minimalism**: ~220 lines total, no unnecessary features
-2. **Single modal design**: One InputModal class handles all user input
-3. **Input parsing**: Commands determined by parsing text ("note X", "sub Y")
-4. **No visual styling**: Colors stored but not rendered (future-ready)
-5. **No settings**: Zero configuration, works out of the box
-6. **No reorganization**: Simplified to creation-only workflow
-7. **No vault updates**: Users manage their own migrations
-8. **Essential commands only**: Create, duplicate, open links, cleanup
+#### VaultUpdateModal (lines 1028-1077)
+- **Purpose**: Displays vault update plan and confirms execution
+- **Features**: Update summary, file list, confirmation workflow
+
+#### CreateMOCModal (lines 1079-1106)
+- **Purpose**: Creates new root MOCs
+- **Features**: Simple text input with validation
+
+#### AddToMOCModal (lines 1108-1141)
+- **Purpose**: Context-aware content addition to existing MOCs
+- **Features**: Button-based selection of content type (Sub-MOC, Note, Resource, Prompt)
+
+#### CreateItemModal (lines 1143-1174)
+- **Purpose**: Generic item creation with name input
+- **Features**: Customizable for different item types
+
+#### PromptDescriptionModal (lines 1176-1210)
+- **Purpose**: Optional description input for prompt iterations
+- **Features**: Skip option, Enter key support
+
+#### CleanupConfirmationModal (lines 1212-1244)
+- **Purpose**: Confirms deletion of all plugin files
+- **Features**: File list display, safety warnings
+
+#### ReorganizeMOCModal (lines 1246-1297)
+- **Purpose**: MOC reorganization options based on context
+- **Features**: Different options for root vs sub-MOCs
+
+#### CreateParentMOCModal (lines 1299-1334)
+- **Purpose**: Creates new parent MOC for reorganization
+- **Features**: Name input with action confirmation
+
+#### SelectParentMOCModal (lines 1336-1372)
+- **Purpose**: Selects existing parent for MOC reorganization
+- **Features**: Scrollable list, circular dependency prevention
+
+## Technical Decisions (Full Implementation)
+
+1. **Comprehensive feature set**: ~1370 lines with complete functionality
+2. **Multiple specialized modals**: Different modals for each operation type
+3. **Context-aware interfaces**: Smart modal selection based on current state
+4. **Full reorganization system**: Complete MOC hierarchy management
+5. **Vault modernization**: Automated updates for legacy structures
+6. **Circular dependency detection**: Prevents invalid MOC relationships
+7. **Event-driven cleanup**: Automatic broken link removal on file deletion
+8. **Complete command set**: All creation, organization, and maintenance features
 
 ## Current Status
 
-**Lean Core Implementation** - Streamlined to essential features:
+**Full-Featured Implementation** - Complete system with all advanced features:
 - Context-aware creation (root MOC, sub-MOC, note, resource, prompt)
 - Hierarchical folder structure (each MOC has own folder)
 - Unlimited random colors/emojis for all MOCs
 - Prompt iteration duplication with hub auto-update
 - LLM links batch opening
+- MOC reorganization system (promote/demote, move between parents)
+- Vault update system (automatic modernization of existing files)
 - System cleanup (delete all plugin files)
+- Circular dependency detection
+- Broken link cleanup on file deletion
 
-**Key Achievement**: Major code reduction from ~2800 lines to ~220 lines while retaining all core functionality. Removed legacy systems, complex modals, reorganization features, and vault update system to focus on essential workflow.
+**Architecture**: Full-featured implementation (~1370 lines) with comprehensive modal system, reorganization capabilities, and vault maintenance tools.
 
 ## History
 
@@ -171,8 +233,10 @@ The plugin uses a single modal class:
 
 10. **Lean Rewrite** - Massive code reduction from ~2800 lines to ~220 lines, removing legacy systems, complex modals, reorganization features, and vault update system while retaining all core functionality
 
+11. **Full Implementation Restore** - Reverted to complete feature set with all advanced capabilities restored
+
 ### Latest Major Change
-**Lean Rewrite (2025-06-19)**: Complete code streamlining that reduced the plugin from ~2800 lines to ~220 lines. Removed all legacy compatibility code, complex modal systems, MOC reorganization features, and vault update systems. Retained only the essential workflow: context-aware creation, prompt iteration management, LLM link handling, and cleanup. Plugin now uses a single streamlined modal for all input and focuses purely on the core MOC workflow.
+**Full Implementation Restore (2025-06-21)**: Restored the complete feature set with all advanced capabilities (~1370 lines). Includes full MOC reorganization system, comprehensive vault update capabilities, multiple specialized modals, circular dependency detection, and complete maintenance tools. Plugin now provides the full workflow: context-aware creation, complete reorganization system, prompt iteration management, vault modernization, LLM link handling, and comprehensive cleanup.
 
 ## Running Issue Log
 
