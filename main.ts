@@ -4,12 +4,19 @@ import { App, Modal, Notice, Plugin, TFile, TFolder, normalizePath } from 'obsid
 // PLUGIN CONSTANTS AND TYPES
 // =================================================================================
 
-interface PluginSettings {}
+/**
+ * Plugin settings interface (currently empty but maintained for future extensibility)
+ */
+type PluginSettings = Record<string, never>;
 
+/**
+ * Default plugin settings
+ */
 const DEFAULT_SETTINGS: PluginSettings = {};
 
 /**
  * Defines the subfolder names within a MOC's primary folder.
+ * Each MOC folder contains these three subfolders for organizing different content types.
  */
 const FOLDERS = {
 	Notes: 'Notes',
@@ -19,18 +26,20 @@ const FOLDERS = {
 
 /**
  * Defines the standard order of sections within a MOC file.
+ * This order is enforced when adding new content to ensure consistency.
  */
 const SECTION_ORDER = ['MOCs', 'Notes', 'Resources', 'Prompts'] as const;
 type SectionType = typeof SECTION_ORDER[number];
 
 /**
- * Defines the standard emoji prefixes and CSS classes for different note types.
+ * Defines the standard emoji prefixes for different note types.
+ * These emojis are prepended to filenames for visual identification.
  */
 const NOTE_TYPES = {
-	MOCs: { emoji: '🔵', class: 'moc' }, // Default for sub-MOCs, though new ones get random emojis.
-	Notes: { emoji: '📝', class: 'note' },
-	Resources: { emoji: '📁', class: 'resource' },
-	Prompts: { emoji: '🤖', class: 'prompt' }
+	MOCs: { emoji: '🔵' }, // Default for sub-MOCs, though new ones get random emojis
+	Notes: { emoji: '📝' },
+	Resources: { emoji: '📁' },
+	Prompts: { emoji: '🤖' }
 } as const;
 
 
@@ -38,6 +47,10 @@ const NOTE_TYPES = {
 // INTERFACES
 // =================================================================================
 
+/**
+ * Represents the result of updating a single file during vault modernization.
+ * Tracks whether the update succeeded and what changes were applied.
+ */
 interface UpdateResult {
 	file: TFile;
 	changes: string[];
@@ -45,6 +58,10 @@ interface UpdateResult {
 	error?: string;
 }
 
+/**
+ * Represents a plan for updating multiple files in the vault.
+ * Used to preview changes before executing them.
+ */
 interface VaultUpdatePlan {
 	filesToUpdate: TFile[];
 	updateSummary: Map<TFile, string[]>;
@@ -56,9 +73,28 @@ interface VaultUpdatePlan {
 // MAIN PLUGIN CLASS
 // =================================================================================
 
+/**
+ * Main plugin class for the MOC System Plugin.
+ * 
+ * This plugin implements a hierarchical note-taking system based on Maps of Content (MOCs).
+ * Each MOC serves as a hub that organizes related sub-MOCs, notes, resources, and prompts.
+ * 
+ * Key features:
+ * - Context-aware note creation based on current location
+ * - Hierarchical folder structure with each MOC having its own folder
+ * - Automatic organization of content into predefined sections
+ * - Prompt iteration management with version control
+ * - MOC reorganization capabilities (promote/demote/move)
+ * - Vault-wide modernization tools
+ * - Cleanup utilities for safe file removal
+ */
 export default class MOCSystemPlugin extends Plugin {
 	settings: PluginSettings;
 
+	/**
+	 * Plugin initialization and setup.
+	 * Loads settings, registers commands, and sets up event listeners.
+	 */
 	async onload() {
 		await this.loadSettings();
 
@@ -130,10 +166,17 @@ export default class MOCSystemPlugin extends Plugin {
 		);
 	}
 
+	/**
+	 * Loads plugin settings from disk.
+	 * Merges saved settings with defaults to ensure all properties exist.
+	 */
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 	}
 
+	/**
+	 * Saves current plugin settings to disk.
+	 */
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
@@ -144,6 +187,10 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Handles the main command, creating a new root MOC or adding content to an existing one.
+	 * 
+	 * This is the primary entry point for user interaction with the plugin.
+	 * If the user is not currently in a MOC, it opens a modal to create a new root MOC.
+	 * If the user is in a MOC, it opens a modal to add new content to that MOC.
 	 */
 	async handleContextCreate() {
 		const activeFile = this.app.workspace.getActiveFile();
@@ -161,25 +208,33 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Creates a new root MOC, including its dedicated folder structure.
-	 * @param name The name of the new MOC.
-	 * @returns The newly created MOC file.
+	 * 
+	 * This method:
+	 * 1. Generates a random emoji prefix for visual identification
+	 * 2. Creates a dedicated folder for the MOC
+	 * 3. Creates subfolders (Notes, Resources, Prompts) within that folder
+	 * 4. Creates the MOC file with appropriate frontmatter
+	 * 5. Opens the newly created file in the workspace
+	 * 
+	 * @param name The name of the new MOC (without emoji prefix or 'MOC' suffix)
+	 * @returns The newly created MOC file
 	 */
 	async createMOC(name: string): Promise<TFile> {
+		// Generate a random emoji for visual identification
 		const randomEmoji = this.getRandomEmoji();
-		const randomColor = this.generateRandomColor();
 		
+		// Create folder and file paths
 		const mocFolderName = `${randomEmoji} ${name} MOC`;
 		const mocFilePath = `${mocFolderName}/${mocFolderName}.md`;
 		
+		// Ensure the MOC folder and its subfolders exist
 		await this.ensureMOCFolderStructure(mocFolderName);
 		
+		// Create the MOC file with minimal frontmatter
 		const content = `---
 tags:
   - moc
 note-type: moc
-root-moc-color: ${randomColor.hex}
-root-moc-light-color: ${randomColor.lightColor}
-root-moc-dark-color: ${randomColor.darkColor}
 ---
 `;
 		
@@ -191,27 +246,32 @@ root-moc-dark-color: ${randomColor.darkColor}
 
 	/**
 	 * Creates a new sub-MOC within a parent MOC's folder structure.
-	 * @param parentMOC The file of the parent MOC.
-	 * @param name The name of the new sub-MOC.
-	 * @returns The newly created sub-MOC file.
+	 * 
+	 * Similar to createMOC but:
+	 * 1. Places the new MOC folder within the parent MOC's folder
+	 * 2. Automatically adds a link to the new sub-MOC in the parent's MOCs section
+	 * 
+	 * @param parentMOC The file of the parent MOC where this sub-MOC will be nested
+	 * @param name The name of the new sub-MOC (without emoji prefix or 'MOC' suffix)
+	 * @returns The newly created sub-MOC file
 	 */
 	async createSubMOC(parentMOC: TFile, name: string): Promise<TFile> {
+		// Generate a random emoji for visual identification
 		const randomEmoji = this.getRandomEmoji();
-		const randomColor = this.generateRandomColor();
 		const parentFolder = parentMOC.parent?.path || '';
 		
+		// Create folder and file paths within the parent MOC's folder
 		const subMocFolderName = `${parentFolder}/${randomEmoji} ${name} MOC`;
 		const subMocFilePath = `${subMocFolderName}/${randomEmoji} ${name} MOC.md`;
 		
+		// Ensure the sub-MOC folder and its subfolders exist
 		await this.ensureMOCFolderStructure(subMocFolderName);
 		
+		// Create the sub-MOC file with minimal frontmatter
 		const content = `---
 tags:
   - moc
 note-type: moc
-root-moc-color: ${randomColor.hex}
-root-moc-light-color: ${randomColor.lightColor}
-root-moc-dark-color: ${randomColor.darkColor}
 ---
 `;
 		
@@ -223,9 +283,17 @@ root-moc-dark-color: ${randomColor.darkColor}
 
 	/**
 	 * Creates a new note inside a parent MOC's "Notes" subfolder.
-	 * @param parentMOC The file of the parent MOC.
-	 * @param name The name of the new note.
-	 * @returns The newly created note file.
+	 * 
+	 * Notes are the primary content files within a MOC.
+	 * They are automatically:
+	 * 1. Prefixed with 📝 emoji
+	 * 2. Placed in the MOC's Notes subfolder
+	 * 3. Tagged with note-type: note in frontmatter
+	 * 4. Linked in the parent MOC's Notes section
+	 * 
+	 * @param parentMOC The file of the parent MOC where this note belongs
+	 * @param name The name of the new note (without emoji prefix)
+	 * @returns The newly created note file
 	 */
 	async createNote(parentMOC: TFile, name: string): Promise<TFile> {
 		const parentFolder = parentMOC.parent?.path || '';
@@ -240,9 +308,17 @@ root-moc-dark-color: ${randomColor.darkColor}
 
 	/**
 	 * Creates a new resource inside a parent MOC's "Resources" subfolder.
-	 * @param parentMOC The file of the parent MOC.
-	 * @param name The name of the new resource.
-	 * @returns The newly created resource file.
+	 * 
+	 * Resources are reference materials or external content related to a MOC.
+	 * They are automatically:
+	 * 1. Prefixed with 📁 emoji
+	 * 2. Placed in the MOC's Resources subfolder
+	 * 3. Tagged with note-type: resource in frontmatter
+	 * 4. Linked in the parent MOC's Resources section
+	 * 
+	 * @param parentMOC The file of the parent MOC where this resource belongs
+	 * @param name The name of the new resource (without emoji prefix)
+	 * @returns The newly created resource file
 	 */
 	async createResource(parentMOC: TFile, name: string): Promise<TFile> {
 		const parentFolder = parentMOC.parent?.path || '';
@@ -257,9 +333,19 @@ root-moc-dark-color: ${randomColor.darkColor}
 
 	/**
 	 * Creates a new prompt hub and its first iteration inside a parent MOC's "Prompts" subfolder.
-	 * @param parentMOC The file of the parent MOC.
-	 * @param name The name of the new prompt.
-	 * @returns The newly created prompt hub file.
+	 * 
+	 * Prompts are special files designed for LLM interactions.
+	 * This method creates:
+	 * 1. A prompt hub file that tracks all iterations
+	 * 2. The first iteration (v1) of the prompt
+	 * 
+	 * The hub includes:
+	 * - An Iterations section with links to all versions
+	 * - An LLM Links section with a code block for storing URLs
+	 * 
+	 * @param parentMOC The file of the parent MOC where this prompt belongs
+	 * @param name The name of the new prompt (without emoji prefix or version)
+	 * @returns The newly created prompt hub file
 	 */
 	async createPrompt(parentMOC: TFile, name: string): Promise<TFile> {
 		const parentFolder = parentMOC.parent?.path || '';
@@ -299,7 +385,15 @@ note-type: prompt
 
 	/**
 	 * Ensures the full folder structure for a given MOC exists.
-	 * @param mocFolderPath The path to the MOC's main folder.
+	 * 
+	 * Creates the MOC's main folder and all required subfolders:
+	 * - Notes/
+	 * - Resources/
+	 * - Prompts/
+	 * 
+	 * Handles race conditions gracefully by ignoring "folder already exists" errors.
+	 * 
+	 * @param mocFolderPath The path to the MOC's main folder
 	 */
 	async ensureMOCFolderStructure(mocFolderPath: string) {
 		if (!this.app.vault.getAbstractFileByPath(mocFolderPath)) {
@@ -324,9 +418,19 @@ note-type: prompt
 
 	/**
 	 * Adds a link to a new file into the correct section of a MOC, reorganizing if necessary.
-	 * @param moc The MOC file to modify.
-	 * @param section The section to add the link to (e.g., 'Notes', 'Resources').
-	 * @param newFile The file to link to.
+	 * 
+	 * This method:
+	 * 1. Reads the MOC content and identifies section locations
+	 * 2. Reorganizes sections to maintain the standard order (MOCs, Notes, Resources, Prompts)
+	 * 3. Creates the section if it doesn't exist
+	 * 4. Adds the new file link in the appropriate section
+	 * 
+	 * The reorganization ensures that plugin-managed sections always appear
+	 * at the top of the file in the correct order, with any user content below.
+	 * 
+	 * @param moc The MOC file to modify
+	 * @param section The section to add the link to (must be one of SECTION_ORDER)
+	 * @param newFile The file to link to (will use its basename for the link)
 	 */
 	async addToMOCSection(moc: TFile, section: SectionType, newFile: TFile) {
 		let content = await this.app.vault.read(moc);
@@ -380,10 +484,18 @@ note-type: prompt
 
 	/**
 	 * Reorganizes MOC content to ensure plugin-managed sections are ordered correctly at the top.
-	 * Any other content is moved to the end of the file.
-	 * @param lines The lines of the MOC file.
-	 * @param frontmatterEnd The index of the line after the closing '---'.
-	 * @returns An object with the reorganized lines and a map of section start indices.
+	 * 
+	 * This method maintains the integrity of the MOC structure by:
+	 * 1. Identifying all plugin-managed sections (MOCs, Notes, Resources, Prompts)
+	 * 2. Extracting them with their content
+	 * 3. Placing them at the top of the file in the standard order
+	 * 4. Moving any other user content to the end of the file
+	 * 
+	 * This ensures consistent MOC structure while preserving user customizations.
+	 * 
+	 * @param lines The lines of the MOC file split by newlines
+	 * @param frontmatterEnd The index of the line after the closing '---' of frontmatter
+	 * @returns An object containing the reorganized lines and a map of section start indices
 	 */
 	private reorganizeContentForPluginSections(lines: string[], frontmatterEnd: number): { reorganizedLines: string[], sectionIndices: Map<SectionType, number> } {
 		const pluginSections: { name: SectionType, content: string[] }[] = [];
@@ -438,6 +550,13 @@ note-type: prompt
 
 	/**
 	 * Finds the end of a markdown section (i.e., the next H2 heading or end of file).
+	 * 
+	 * Used to determine where one section ends and another begins.
+	 * Sections are delimited by H2 headings (lines starting with '## ').
+	 * 
+	 * @param lines The array of file lines
+	 * @param sectionStartIndex The index where the current section starts
+	 * @returns The index where the section ends (exclusive)
 	 */
 	private findSectionEnd(lines: string[], sectionStartIndex: number): number {
 		for (let i = sectionStartIndex + 1; i < lines.length; i++) {
@@ -455,7 +574,15 @@ note-type: prompt
 
 	/**
 	 * Duplicates a prompt iteration, incrementing the version number.
-	 * @param file The prompt iteration file to duplicate.
+	 * 
+	 * This method:
+	 * 1. Parses the current version from the filename (e.g., "v2" from "Prompt v2.md")
+	 * 2. Finds the highest version number among all iterations
+	 * 3. Creates a new iteration with the next version number
+	 * 4. Optionally adds a description to the filename
+	 * 5. Updates the prompt hub to include the new iteration
+	 * 
+	 * @param file The prompt iteration file to duplicate (must match pattern "*v\d+*")
 	 */
 	async duplicatePromptIteration(file: TFile) {
 		const match = file.basename.match(/^(?:🤖\s+)?(.+?)\s*v(\d+)/);
@@ -492,6 +619,13 @@ note-type: prompt
 	
 	/**
 	 * Adds a link to a new prompt iteration to its corresponding hub file.
+	 * 
+	 * The hub file maintains a list of all iterations in its "## Iterations" section.
+	 * This method finds that section and appends the new iteration link.
+	 * 
+	 * @param baseName The base name of the prompt (without emoji or version)
+	 * @param newIteration The newly created iteration file to link
+	 * @param promptsFolderPath The path to the Prompts folder containing the hub
 	 */
 	async updatePromptHub(baseName: string, newIteration: TFile, promptsFolderPath: string) {
 		const hubPath = `${promptsFolderPath}/${NOTE_TYPES.Prompts.emoji} ${baseName}.md`;
@@ -516,6 +650,16 @@ note-type: prompt
 
 	/**
 	 * Opens all URLs found in an `llm-links` code block in the active file.
+	 * 
+	 * Searches for a code block with the following format:
+	 * ```llm-links
+	 * https://example.com/chat1
+	 * https://example.com/chat2
+	 * ```
+	 * 
+	 * Each URL is opened in a new browser tab.
+	 * 
+	 * @param file The prompt hub file to search for LLM links
 	 */
 	async openLLMLinks(file: TFile) {
 		const content = await this.app.vault.read(file);
@@ -541,6 +685,12 @@ note-type: prompt
 
 	/**
 	 * Initiates the MOC reorganization process by opening a context-aware modal.
+	 * 
+	 * The modal options depend on whether the MOC is:
+	 * - A root MOC: Can be moved under a parent
+	 * - A sub-MOC: Can be promoted to root or moved to a different parent
+	 * 
+	 * @param moc The MOC file to reorganize
 	 */
 	async reorganizeMOC(moc: TFile) {
 		new ReorganizeMOCModal(this.app, moc, this).open();
@@ -548,9 +698,16 @@ note-type: prompt
 
 	/**
 	 * Converts a root MOC into a sub-MOC by moving its folder under a parent MOC.
-	 * @param moc The root MOC to move.
-	 * @param parentMOCName The name for a new parent MOC to be created.
-	 * @param existingParent An existing MOC to use as the parent.
+	 * 
+	 * This operation:
+	 * 1. Creates a new parent MOC if needed (when parentMOCName is provided)
+	 * 2. Moves the entire MOC folder to be a subfolder of the parent
+	 * 3. Updates the parent MOC to include a link to the moved MOC
+	 * 4. Obsidian automatically updates all internal links
+	 * 
+	 * @param moc The root MOC to move
+	 * @param parentMOCName The name for a new parent MOC to be created (if existingParent is null)
+	 * @param existingParent An existing MOC to use as the parent (if provided, parentMOCName is ignored)
 	 */
 	async moveRootMOCToSub(moc: TFile, parentMOCName: string | null, existingParent: TFile | null) {
 		try {
@@ -589,7 +746,13 @@ note-type: prompt
 
 	/**
 	 * Promotes a sub-MOC to a root MOC by moving its folder to the vault's root.
-	 * @param moc The sub-MOC to promote.
+	 * 
+	 * This operation:
+	 * 1. Removes all links to this MOC from any parent MOCs
+	 * 2. Moves the MOC folder to the vault root
+	 * 3. Opens the promoted MOC in the workspace
+	 * 
+	 * @param moc The sub-MOC to promote to root level
 	 */
 	async promoteSubMOCToRoot(moc: TFile) {
 		try {
@@ -615,8 +778,14 @@ note-type: prompt
 
 	/**
 	 * Moves a sub-MOC from its current parent to a new parent MOC.
-	 * @param moc The sub-MOC to move.
-	 * @param newParent The new parent MOC.
+	 * 
+	 * This operation:
+	 * 1. Removes links to this MOC from all current parent MOCs
+	 * 2. Moves the MOC folder to be under the new parent's folder
+	 * 3. Adds a link to the moved MOC in the new parent's MOCs section
+	 * 
+	 * @param moc The sub-MOC to move
+	 * @param newParent The new parent MOC (must not create circular dependency)
 	 */
 	async moveSubMOCToNewParent(moc: TFile, newParent: TFile) {
 		try {
@@ -646,7 +815,12 @@ note-type: prompt
 
 	/**
 	 * Removes links to a given MOC from any other MOCs that link to it.
-	 * @param moc The MOC file whose links should be removed from parents.
+	 * 
+	 * Used when moving or promoting MOCs to clean up old parent relationships.
+	 * Searches all MOCs in the vault and removes any links matching the pattern:
+	 * `- [[MOC Name]]`
+	 * 
+	 * @param moc The MOC file whose links should be removed from all parents
 	 */
 	async removeFromParentMOCs(moc: TFile) {
 		const allMOCs = await this.getAllMOCs();
@@ -670,6 +844,18 @@ note-type: prompt
 
 	/**
 	 * Initiates the process to update the entire vault to the latest plugin standards.
+	 * 
+	 * This comprehensive modernization tool:
+	 * 1. Scans all markdown files in the vault
+	 * 2. Identifies files that need updates (missing metadata, old structure, etc.)
+	 * 3. Presents a preview of all planned changes
+	 * 4. Executes updates upon user confirmation
+	 * 
+	 * Common updates include:
+	 * - Adding missing note-type frontmatter
+	 * - Migrating to hierarchical folder structure
+	 * - Adding required emoji prefixes
+	 * - Adding MOC suffix to MOC filenames
 	 */
 	async updateVaultToLatestSystem() {
 		new Notice('Analyzing vault for updates...');
@@ -691,6 +877,12 @@ note-type: prompt
 
 	/**
 	 * Scans the vault to find all files that need updating.
+	 * 
+	 * Examines each markdown file to determine if it:
+	 * - Is a plugin-managed file (has note-type or looks like one)
+	 * - Needs any updates to conform to current standards
+	 * 
+	 * @returns A comprehensive plan detailing all files and their required updates
 	 */
 	async analyzeVaultForUpdates(): Promise<VaultUpdatePlan> {
 		const allFiles = this.app.vault.getMarkdownFiles();
@@ -714,6 +906,15 @@ note-type: prompt
 	
 	/**
 	 * Detects what updates an individual file needs to conform to the system.
+	 * 
+	 * Checks for:
+	 * 1. Missing note-type metadata
+	 * 2. Files that need migration to hierarchical folder structure
+	 * 3. MOCs missing required suffix or emoji prefix
+	 * 4. Other file types missing their emoji prefixes
+	 * 
+	 * @param file The file to analyze
+	 * @returns Array of human-readable update descriptions
 	 */
 	async detectRequiredUpdates(file: TFile): Promise<string[]> {
 		const updates: string[] = [];
@@ -741,9 +942,7 @@ note-type: prompt
 		if (this.isMOC(file)) {
 			if (!file.basename.endsWith(' MOC')) updates.push('Add "MOC" suffix to filename');
 			
-			const hasRandomColor = cache?.frontmatter?.['root-moc-color'] && cache?.frontmatter?.['root-moc-light-color'];
-			if (!hasRandomColor) updates.push('Add random color system to frontmatter');
-			
+			// Check for emoji prefix using Unicode ranges
 			if (!/^[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(file.basename)) {
 				updates.push('Add random emoji prefix to filename');
 			}
@@ -764,6 +963,12 @@ note-type: prompt
 
 	/**
 	 * Executes the update plan, modifying files as needed.
+	 * 
+	 * Applies all planned updates to each file in sequence.
+	 * Tracks success/failure for each file and reports overall results.
+	 * 
+	 * @param plan The update plan generated by analyzeVaultForUpdates
+	 * @returns Array of results for each file update attempt
 	 */
 	async executeUpdatePlan(plan: VaultUpdatePlan): Promise<UpdateResult[]> {
 		const results: UpdateResult[] = [];
@@ -782,6 +987,15 @@ note-type: prompt
 
 	/**
 	 * Applies a list of specific updates to a single file.
+	 * 
+	 * Processes each update in sequence:
+	 * - Frontmatter updates are applied via processFrontMatter
+	 * - File moves/renames update the currentFile reference
+	 * - All updates are tracked for reporting
+	 * 
+	 * @param file The file to update
+	 * @param updates Array of update descriptions to apply
+	 * @returns Result object indicating success and any errors
 	 */
 	async updateFile(file: TFile, updates: string[]): Promise<UpdateResult> {
 		let currentFile = file;
@@ -791,13 +1005,6 @@ note-type: prompt
 					const noteType = update.split(': ')[1];
 					await this.app.fileManager.processFrontMatter(currentFile, (fm) => {
 						fm['note-type'] = noteType;
-					});
-				} else if (update.includes('random color system')) {
-					const randomColor = this.generateRandomColor();
-					await this.app.fileManager.processFrontMatter(currentFile, (fm) => {
-						fm['root-moc-color'] = randomColor.hex;
-						fm['root-moc-light-color'] = randomColor.lightColor;
-						fm['root-moc-dark-color'] = randomColor.darkColor;
 					});
 				} else if (update.includes('folder structure')) {
 					currentFile = await this.migrateToHierarchicalStructure(currentFile);
@@ -813,6 +1020,13 @@ note-type: prompt
 	
 	/**
 	 * Migrates a file from the old flat structure to the new hierarchical one.
+	 * 
+	 * Currently only handles root MOCs that need their own folders.
+	 * Other files require manual reorganization via the "Reorganize MOC" command
+	 * because the plugin cannot determine their intended parent MOC.
+	 * 
+	 * @param file The file to migrate
+	 * @returns The file at its new location (or original if not migrated)
 	 */
 	private async migrateToHierarchicalStructure(file: TFile): Promise<TFile> {
 		if (this.isMOC(file) && this.isRootMOC(file)) {
@@ -832,6 +1046,15 @@ note-type: prompt
 
 	/**
 	 * Updates a filename to add required prefixes or suffixes.
+	 * 
+	 * Handles:
+	 * - Adding emoji prefixes based on file type
+	 * - Adding 'MOC' suffix to MOC files
+	 * - Preserving the file extension and path
+	 * 
+	 * @param file The file to rename
+	 * @param update The update description (used to determine what to add)
+	 * @returns The file at its new location after renaming
 	 */
 	private async updateFileName(file: TFile, update: string): Promise<TFile> {
 		let newBasename = file.basename;
@@ -856,6 +1079,12 @@ note-type: prompt
 
 	/**
 	 * Removes all files created by the plugin after confirmation.
+	 * 
+	 * Identifies all files with note-type frontmatter (moc, note, resource, prompt)
+	 * and presents them for deletion. This is a destructive operation that
+	 * cannot be undone, so user confirmation is required.
+	 * 
+	 * Note: Only deletes files, not folders. Empty folders remain.
 	 */
 	async cleanupMOCSystem() {
 		const allFiles = this.app.vault.getMarkdownFiles();
@@ -886,6 +1115,12 @@ note-type: prompt
 	
 	/**
 	 * Removes broken links from all files when a file is deleted.
+	 * 
+	 * Automatically triggered when any file is deleted.
+	 * Searches all markdown files for links to the deleted file
+	 * and removes those link lines to prevent broken references.
+	 * 
+	 * @param deletedFile The file that was just deleted
 	 */
 	async cleanupBrokenLinks(deletedFile: TFile) {
 		const allFiles = this.app.vault.getMarkdownFiles();
@@ -906,13 +1141,29 @@ note-type: prompt
 	// HELPER & UTILITY METHODS
 	// =================================================================================
 
-	/** Checks if a file is a MOC based on its frontmatter tag. */
+	/**
+	 * Checks if a file is a MOC based on its frontmatter tag.
+	 * 
+	 * A file is considered a MOC if it has 'moc' in its tags array.
+	 * This is the primary way to identify MOCs regardless of filename.
+	 * 
+	 * @param file The file to check
+	 * @returns true if the file is tagged as a MOC
+	 */
 	isMOC(file: TFile): boolean {
 		const cache = this.app.metadataCache.getFileCache(file);
 		return cache?.frontmatter?.tags?.includes('moc') ?? false;
 	}
 	
-	/** Checks if a MOC is a root MOC (i.e., its folder is at the top level of the vault). */
+	/**
+	 * Checks if a MOC is a root MOC (i.e., its folder is at the top level of the vault).
+	 * 
+	 * Root MOCs have their folders directly in the vault root.
+	 * Sub-MOCs have their folders nested within other MOC folders.
+	 * 
+	 * @param file The file to check
+	 * @returns true if the MOC's folder is at the vault root level
+	 */
 	isRootMOC(file: TFile): boolean {
 		if (!this.isMOC(file)) return false;
 		const folderPath = file.parent?.path || '';
@@ -920,19 +1171,44 @@ note-type: prompt
 		return !folderPath.includes('/');
 	}
 
-	/** Checks if a file is a prompt iteration (e.g., contains 'v1', 'v2'). */
+	/**
+	 * Checks if a file is a prompt iteration (e.g., contains 'v1', 'v2').
+	 * 
+	 * Prompt iterations are versioned files with patterns like:
+	 * - "Prompt v1.md"
+	 * - "Prompt v2 - description.md"
+	 * 
+	 * @param file The file to check
+	 * @returns true if the file is a prompt iteration with version number
+	 */
 	isPromptIteration(file: TFile): boolean {
 		const noteType = this.app.metadataCache.getFileCache(file)?.frontmatter?.['note-type'];
 		return noteType === 'prompt' && /v\d+/.test(file.basename);
 	}
 
-	/** Checks if a file is a prompt hub (a prompt that isn't an iteration). */
+	/**
+	 * Checks if a file is a prompt hub (a prompt that isn't an iteration).
+	 * 
+	 * Prompt hubs are the main prompt files that track all iterations.
+	 * They don't have version numbers in their names.
+	 * 
+	 * @param file The file to check
+	 * @returns true if the file is a prompt hub (not an iteration)
+	 */
 	isPromptHub(file: TFile): boolean {
 		const noteType = this.app.metadataCache.getFileCache(file)?.frontmatter?.['note-type'];
 		return noteType === 'prompt' && !this.isPromptIteration(file);
 	}
 
-	/** Detects if a file needs to be migrated to the hierarchical folder structure. */
+	/**
+	 * Detects if a file needs to be migrated to the hierarchical folder structure.
+	 * 
+	 * Currently only detects root MOCs that are files in the vault root
+	 * instead of having their own folders.
+	 * 
+	 * @param file The file to check
+	 * @returns true if the file needs folder migration
+	 */
 	private needsFolderMigration(file: TFile): boolean {
 		// A root MOC that is a file in the vault root needs a folder.
 		if (this.isMOC(file) && this.isRootMOC(file) && file.parent?.isRoot()) {
@@ -941,7 +1217,16 @@ note-type: prompt
 		return false;
 	}
 
-	/** Detects a file's type based on its path or name. */
+	/**
+	 * Detects a file's type based on its path or name.
+	 * 
+	 * Uses various heuristics:
+	 * - MOCs are detected by tag
+	 * - Other types are inferred from their folder location
+	 * 
+	 * @param file The file to analyze
+	 * @returns The detected note-type or null if not a plugin file
+	 */
 	private detectFileType(file: TFile): string | null {
 		if (this.isMOC(file)) return 'moc';
 		if (file.path.includes(`/${FOLDERS.Notes}/`)) return 'note';
@@ -950,12 +1235,31 @@ note-type: prompt
 		return null;
 	}
 
-	/** Gets all MOC files in the vault. */
+	/**
+	 * Gets all MOC files in the vault.
+	 * 
+	 * Scans all markdown files and returns those tagged as MOCs.
+	 * Used for reorganization operations and relationship management.
+	 * 
+	 * @returns Array of all MOC files in the vault
+	 */
 	async getAllMOCs(): Promise<TFile[]> {
 		return this.app.vault.getMarkdownFiles().filter(f => this.isMOC(f));
 	}
 
-	/** Checks if making a MOC a parent of another would create a circular dependency. */
+	/**
+	 * Checks if making a MOC a parent of another would create a circular dependency.
+	 * 
+	 * Prevents invalid hierarchies where:
+	 * - A MOC would become its own ancestor
+	 * - Two MOCs would be each other's parent/child
+	 * 
+	 * Uses breadth-first search through the link graph starting from the MOC.
+	 * 
+	 * @param moc The MOC that would become a child
+	 * @param potentialParent The MOC that would become the parent
+	 * @returns true if this relationship would create a cycle
+	 */
 	detectCircularDependency(moc: TFile, potentialParent: TFile): boolean {
 		const visited = new Set<string>();
 		const queue: TFile[] = [moc];
@@ -979,31 +1283,20 @@ note-type: prompt
 	}
 
 	// =================================================================================
-	// UNLIMITED RANDOM SYSTEM (DATA ONLY)
+	// RANDOM GENERATION UTILITIES
 	// =================================================================================
 
 	/**
-	 * Generates a random, visually appealing RGB color and its light/dark variants.
-	 */
-	private generateRandomColor(): { lightColor: string, darkColor: string, hex: string } {
-		// Generate RGB values that are not too dark or too light for good visibility.
-		const randomChannel = () => 64 + Math.floor(Math.random() * (224 - 64));
-		const r = randomChannel(), g = randomChannel(), b = randomChannel();
-		
-		const toHex = (c: number) => c.toString(16).padStart(2, '0');
-		const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-		
-		// Create a brighter variant for dark mode.
-		const lightR = Math.min(255, r + 50);
-		const lightG = Math.min(255, g + 50);
-		const lightB = Math.min(255, b + 50);
-		const lightHex = `#${toHex(lightR)}${toHex(lightG)}${toHex(lightB)}`;
-		
-		return { lightColor: hex, darkColor: lightHex, hex: hex };
-	}
-
-	/**
 	 * Selects a random emoji from a wide range of Unicode blocks.
+	 * Used to provide visual identification for MOCs.
+	 * 
+	 * Emoji ranges include:
+	 * - Emoticons (smileys and emotion)
+	 * - Miscellaneous Symbols and Pictographs
+	 * - Transport and Map Symbols
+	 * - Supplemental Symbols and Pictographs
+	 * 
+	 * @returns A single random emoji character
 	 */
 	private getRandomEmoji(): string {
 		const emojiRanges = [
@@ -1023,8 +1316,16 @@ note-type: prompt
 // =================================================================================
 // MODAL DIALOGS
 // =================================================================================
-// These are largely unchanged as they were already well-structured.
 
+/**
+ * Modal for displaying vault update plans and confirming execution.
+ * 
+ * Shows:
+ * - Total number of files to update
+ * - Detailed list of files and their required changes
+ * - Warning about file modifications
+ * - Confirm/Cancel buttons
+ */
 class VaultUpdateModal extends Modal {
 	constructor(
 		app: App,
@@ -1034,6 +1335,12 @@ class VaultUpdateModal extends Modal {
 		super(app);
 	}
 
+	/**
+	 * Renders the vault update modal content.
+	 * 
+	 * Creates a detailed view of all pending updates with
+	 * file paths and specific changes listed for each file.
+	 */
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.createEl('h2', { text: 'Update Vault to Latest System' });
@@ -1071,11 +1378,19 @@ class VaultUpdateModal extends Modal {
 		});
 	}
 
+	/**
+	 * Cleanup method called when modal is closed.
+	 */
 	onClose() {
 		this.contentEl.empty();
 	}
 }
 
+/**
+ * Simple modal for creating a new root MOC.
+ * 
+ * Provides a text input for the MOC name and handles Enter key submission.
+ */
 class CreateMOCModal extends Modal {
 	constructor(app: App, private onSubmit: (name: string) => void) {
 		super(app);
@@ -1105,6 +1420,17 @@ class CreateMOCModal extends Modal {
 	}
 }
 
+/**
+ * Modal for adding content to an existing MOC.
+ * 
+ * Presents buttons for creating:
+ * - Sub-MOC
+ * - Note  
+ * - Resource
+ * - Prompt
+ * 
+ * Each button opens a secondary modal for naming the new item.
+ */
 class AddToMOCModal extends Modal {
 	constructor(
 		app: App, 
@@ -1140,6 +1466,14 @@ class AddToMOCModal extends Modal {
 	}
 }
 
+/**
+ * Generic modal for creating any type of item (note, resource, etc.).
+ * 
+ * Reusable component that:
+ * - Shows appropriate label based on item type
+ * - Handles text input and validation
+ * - Supports Enter key submission
+ */
 class CreateItemModal extends Modal {
 	constructor(
 		app: App,
@@ -1173,6 +1507,14 @@ class CreateItemModal extends Modal {
 	}
 }
 
+/**
+ * Modal for adding optional descriptions to prompt iterations.
+ * 
+ * Features:
+ * - Optional description input
+ * - Skip button for no description
+ * - Description becomes part of filename (e.g., "v2 - description")
+ */
 class PromptDescriptionModal extends Modal {
 	constructor(app: App, private onSubmit: (description: string) => void) {
 		super(app);
@@ -1209,6 +1551,15 @@ class PromptDescriptionModal extends Modal {
 	}
 }
 
+/**
+ * Modal for confirming deletion of all plugin-managed files.
+ * 
+ * Shows:
+ * - Number of files to delete
+ * - List of file paths (truncated if too many)
+ * - Warning about permanent deletion
+ * - Styled delete button to indicate danger
+ */
 class CleanupConfirmationModal extends Modal {
 	constructor(
 		app: App, 
@@ -1243,6 +1594,15 @@ class CleanupConfirmationModal extends Modal {
 	}
 }
 
+/**
+ * Context-aware modal for MOC reorganization options.
+ * 
+ * Shows different options based on MOC type:
+ * - Root MOCs: Can be moved under a parent
+ * - Sub-MOCs: Can be promoted to root or moved to different parent
+ * 
+ * Prevents circular dependencies in MOC relationships.
+ */
 class ReorganizeMOCModal extends Modal {
 	constructor(
 		app: App,
@@ -1296,6 +1656,12 @@ class ReorganizeMOCModal extends Modal {
 	}
 }
 
+/**
+ * Modal for creating a new parent MOC during reorganization.
+ * 
+ * Used when moving a root MOC under a new parent that doesn't exist yet.
+ * Creates the parent MOC and immediately moves the child under it.
+ */
 class CreateParentMOCModal extends Modal {
 	constructor(
 		app: App,
@@ -1333,6 +1699,15 @@ class CreateParentMOCModal extends Modal {
 	}
 }
 
+/**
+ * Modal for selecting an existing MOC as a parent during reorganization.
+ * 
+ * Features:
+ * - Scrollable list of available MOCs
+ * - Filters out MOCs that would create circular dependencies
+ * - Sorted alphabetically by path
+ * - Different behavior for moving root vs sub MOCs
+ */
 class SelectParentMOCModal extends Modal {
 	constructor(
 		app: App,
