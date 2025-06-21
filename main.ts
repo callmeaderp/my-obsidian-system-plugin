@@ -90,6 +90,7 @@ interface VaultUpdatePlan {
  */
 export default class MOCSystemPlugin extends Plugin {
 	settings: PluginSettings;
+	private styleElement: HTMLStyleElement | null = null;
 
 	/**
 	 * Plugin initialization and setup.
@@ -97,6 +98,7 @@ export default class MOCSystemPlugin extends Plugin {
 	 */
 	async onload() {
 		await this.loadSettings();
+		await this.loadStyles();
 
 		// --- Command Registration ---
 		this.addCommand({
@@ -167,6 +169,14 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	/**
+	 * Plugin cleanup and teardown.
+	 * Removes injected styles when the plugin is disabled.
+	 */
+	onunload() {
+		this.removeStyles();
+	}
+
+	/**
 	 * Loads plugin settings from disk.
 	 * Merges saved settings with defaults to ensure all properties exist.
 	 */
@@ -179,6 +189,38 @@ export default class MOCSystemPlugin extends Plugin {
 	 */
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	/**
+	 * Loads and injects CSS styles for MOC folder highlighting.
+	 * 
+	 * Reads the styles.css file and injects it into the document head
+	 * to provide visual distinction for MOC folders in the file explorer.
+	 */
+	async loadStyles() {
+		try {
+			const cssPath = normalizePath(`${this.app.vault.configDir}/plugins/${this.manifest.id}/styles.css`);
+			const cssContent = await this.app.vault.adapter.read(cssPath);
+			
+			this.styleElement = document.createElement('style');
+			this.styleElement.id = 'moc-system-plugin-styles';
+			this.styleElement.textContent = cssContent;
+			document.head.appendChild(this.styleElement);
+		} catch (error) {
+			console.warn('MOC System Plugin: Could not load styles.css', error);
+		}
+	}
+
+	/**
+	 * Removes injected CSS styles.
+	 * 
+	 * Called during plugin unload to clean up any styling changes.
+	 */
+	removeStyles() {
+		if (this.styleElement) {
+			this.styleElement.remove();
+			this.styleElement = null;
+		}
 	}
 
 	// =================================================================================
@@ -197,8 +239,8 @@ export default class MOCSystemPlugin extends Plugin {
 		
 		if (!activeFile || !this.isMOC(activeFile)) {
 			// If not in a MOC, open modal to create a new root MOC.
-			new CreateMOCModal(this.app, async (name: string) => {
-				await this.createMOC(name);
+			new CreateMOCModal(this.app, this, async (name: string) => {
+				// MOC creation is now handled within the modal
 			}).open();
 		} else {
 			// If in a MOC, open modal to add new content (Sub-MOC, Note, etc.).
@@ -332,12 +374,17 @@ note-type: moc
 	}
 
 	/**
-	 * Creates a new prompt hub and its first iteration inside a parent MOC's "Prompts" subfolder.
+	 * Creates a new prompt hub and its first iteration inside a dedicated subfolder.
 	 * 
 	 * Prompts are special files designed for LLM interactions.
 	 * This method creates:
-	 * 1. A prompt hub file that tracks all iterations
-	 * 2. The first iteration (v1) of the prompt
+	 * 1. A dedicated subfolder for the prompt within the Prompts folder
+	 * 2. A prompt hub file that tracks all iterations
+	 * 3. The first iteration (v1) of the prompt
+	 * 
+	 * Structure created:
+	 * - MOC/Prompts/PromptName/🤖 PromptName.md (hub)
+	 * - MOC/Prompts/PromptName/🤖 PromptName v1.md (iteration)
 	 * 
 	 * The hub includes:
 	 * - An Iterations section with links to all versions
@@ -349,11 +396,17 @@ note-type: moc
 	 */
 	async createPrompt(parentMOC: TFile, name: string): Promise<TFile> {
 		const parentFolder = parentMOC.parent?.path || '';
-		const promptFolder = `${parentFolder}/${FOLDERS.Prompts}`;
+		const promptsFolder = `${parentFolder}/${FOLDERS.Prompts}`;
+		const promptSubfolder = `${promptsFolder}/${name}`;
 		const iterationBasename = `${NOTE_TYPES.Prompts.emoji} ${name} v1`;
 
-		// Create prompt hub
-		const hubFileName = `${promptFolder}/${NOTE_TYPES.Prompts.emoji} ${name}.md`;
+		// Ensure the prompt's dedicated subfolder exists
+		if (!this.app.vault.getAbstractFileByPath(promptSubfolder)) {
+			await this.app.vault.createFolder(promptSubfolder);
+		}
+
+		// Create prompt hub in the subfolder
+		const hubFileName = `${promptSubfolder}/${NOTE_TYPES.Prompts.emoji} ${name}.md`;
 		const hubContent = `---
 note-type: prompt
 ---
@@ -373,8 +426,8 @@ note-type: prompt
 		
 		const hubFile = await this.app.vault.create(normalizePath(hubFileName), hubContent);
 		
-		// Create first iteration
-		const iterationFileName = `${promptFolder}/${iterationBasename}.md`;
+		// Create first iteration in the same subfolder
+		const iterationFileName = `${promptSubfolder}/${iterationBasename}.md`;
 		const iterationContent = `---\nnote-type: prompt\n---\n`;
 		await this.app.vault.create(normalizePath(iterationFileName), iterationContent);
 		
@@ -605,13 +658,14 @@ note-type: prompt
 			const descPart = description ? ` - ${description}` : '';
 			const newName = `${NOTE_TYPES.Prompts.emoji} ${baseName} v${nextVersion}${descPart}`;
 			
-			const newPath = `${promptsFolder.path}/${newName}.md`;
+			const promptSubfolder = promptsFolder.path;
+			const newPath = `${promptSubfolder}/${newName}.md`;
 			const originalContent = await this.app.vault.read(file);
 			const contentWithFrontmatter = originalContent.startsWith('---') ? originalContent : `---\nnote-type: prompt\n---\n\n${originalContent}`;
 			
 			const newFile = await this.app.vault.create(normalizePath(newPath), contentWithFrontmatter);
 			
-			await this.updatePromptHub(baseName, newFile, promptsFolder.path);
+			await this.updatePromptHub(baseName, newFile, promptSubfolder);
 			await this.app.workspace.getLeaf().openFile(newFile);
 			new Notice(`Created iteration: ${newName}`);
 		}).open();
@@ -622,13 +676,14 @@ note-type: prompt
 	 * 
 	 * The hub file maintains a list of all iterations in its "## Iterations" section.
 	 * This method finds that section and appends the new iteration link.
+	 * Now works with the new subfolder structure where hubs are in dedicated subfolders.
 	 * 
 	 * @param baseName The base name of the prompt (without emoji or version)
 	 * @param newIteration The newly created iteration file to link
-	 * @param promptsFolderPath The path to the Prompts folder containing the hub
+	 * @param promptSubfolderPath The path to the prompt's dedicated subfolder
 	 */
-	async updatePromptHub(baseName: string, newIteration: TFile, promptsFolderPath: string) {
-		const hubPath = `${promptsFolderPath}/${NOTE_TYPES.Prompts.emoji} ${baseName}.md`;
+	async updatePromptHub(baseName: string, newIteration: TFile, promptSubfolderPath: string) {
+		const hubPath = `${promptSubfolderPath}/${NOTE_TYPES.Prompts.emoji} ${baseName}.md`;
 		const hubFile = this.app.vault.getAbstractFileByPath(normalizePath(hubPath));
 		
 		if (hubFile instanceof TFile) {
@@ -1387,12 +1442,20 @@ class VaultUpdateModal extends Modal {
 }
 
 /**
- * Simple modal for creating a new root MOC.
+ * Enhanced modal for creating a new root MOC with optional prompt creation.
  * 
- * Provides a text input for the MOC name and handles Enter key submission.
+ * Features:
+ * - Text input for MOC name
+ * - Checkbox to create a prompt alongside the MOC
+ * - Optional prompt name input (inherits from MOC name if empty)
+ * - Enter key submission support
  */
 class CreateMOCModal extends Modal {
-	constructor(app: App, private onSubmit: (name: string) => void) {
+	constructor(
+		app: App, 
+		private plugin: MOCSystemPlugin,
+		private onSubmit: (name: string) => void
+	) {
 		super(app);
 	}
 
@@ -1400,19 +1463,80 @@ class CreateMOCModal extends Modal {
 		const { contentEl } = this;
 		contentEl.createEl('h2', { text: 'Create new MOC' });
 
-		const inputEl = contentEl.createEl('input', { type: 'text', placeholder: 'MOC name...' });
-		inputEl.style.width = '100%';
-		inputEl.focus();
+		// MOC name input
+		const mocNameEl = contentEl.createEl('input', { type: 'text', placeholder: 'MOC name...' });
+		mocNameEl.style.width = '100%';
+		mocNameEl.style.marginBottom = '15px';
+		mocNameEl.focus();
 
-		const submit = () => {
-			if (inputEl.value) {
-				this.onSubmit(inputEl.value);
-				this.close();
+		// Prompt creation section
+		const promptSection = contentEl.createDiv({ cls: 'moc-creation-prompt-section' });
+		promptSection.style.cssText = 'border-top: 1px solid var(--background-modifier-border); padding-top: 15px; margin-top: 15px;';
+
+		const checkboxContainer = promptSection.createDiv();
+		checkboxContainer.style.cssText = 'display: flex; align-items: center; margin-bottom: 10px;';
+
+		const createPromptCheckbox = checkboxContainer.createEl('input', { type: 'checkbox' });
+		createPromptCheckbox.style.marginRight = '8px';
+		
+		const checkboxLabel = checkboxContainer.createEl('label', { text: 'Also create a prompt' });
+		checkboxLabel.style.cursor = 'pointer';
+		checkboxLabel.addEventListener('click', () => {
+			createPromptCheckbox.checked = !createPromptCheckbox.checked;
+			togglePromptNameInput();
+		});
+
+		// Prompt name input (initially hidden)
+		const promptNameEl = promptSection.createEl('input', { 
+			type: 'text', 
+			placeholder: 'Prompt name (leave empty to use MOC name)...' 
+		});
+		promptNameEl.style.width = '100%';
+		promptNameEl.style.display = 'none';
+
+		const togglePromptNameInput = () => {
+			promptNameEl.style.display = createPromptCheckbox.checked ? 'block' : 'none';
+		};
+
+		createPromptCheckbox.addEventListener('change', togglePromptNameInput);
+
+		const submit = async () => {
+			const mocName = mocNameEl.value.trim();
+			if (!mocName) return;
+
+			// Create the MOC first
+			const mocFile = await this.plugin.createMOC(mocName);
+
+			// Create prompt if requested
+			if (createPromptCheckbox.checked) {
+				const promptName = promptNameEl.value.trim() || mocName.replace(/\s+MOC$/i, '').trim() || mocName;
+				await this.plugin.createPrompt(mocFile, promptName);
+			}
+
+			this.onSubmit(mocName);
+			this.close();
+		};
+
+		// Button container
+		const buttonContainer = contentEl.createDiv({ cls: 'moc-system-modal-buttons' });
+		buttonContainer.style.cssText = 'display: flex; gap: 10px; margin-top: 20px;';
+
+		const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+		cancelBtn.addEventListener('click', () => this.close());
+
+		const createBtn = buttonContainer.createEl('button', { text: 'Create', cls: 'mod-cta' });
+		createBtn.addEventListener('click', submit);
+
+		// Enter key handling
+		const handleEnter = (e: KeyboardEvent) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				submit();
 			}
 		};
 
-		inputEl.addEventListener('keypress', (e) => e.key === 'Enter' && submit());
-		contentEl.createEl('button', { text: 'Create' }).addEventListener('click', submit);
+		mocNameEl.addEventListener('keypress', handleEnter);
+		promptNameEl.addEventListener('keypress', handleEnter);
 	}
 
 	onClose() {

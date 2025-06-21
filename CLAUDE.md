@@ -12,7 +12,8 @@ Custom Obsidian plugin for automating a MOC (Map of Content) based note-taking s
 ## Project Structure
 
 ### Core Files
-- **`main.ts`** - Full implementation (~1370 lines) with comprehensive documentation
+- **`main.ts`** - Full implementation (~1540 lines) with comprehensive documentation
+- **`styles.css`** - Visual styling for MOC folders in file explorer
 - **`manifest.json`** - Plugin metadata and compatibility
 - **`package.json`** - Dependencies and build scripts
 - **Other**: TypeScript config, build config, documentation files
@@ -23,12 +24,18 @@ Custom Obsidian plugin for automating a MOC (Map of Content) based note-taking s
 Each MOC has its own folder containing the MOC file and subfolders for Notes/, Resources/, and Prompts/. Sub-MOCs nest within parent folders.
 
 ### Visual System
-- **MOCs**: Random Unicode emoji prefix
+- **MOCs**: Random Unicode emoji prefix with color-coded folder styling
 - **Notes**: 📝 prefix
 - **Resources**: 📁 prefix
 - **Prompts**: 🤖 prefix
 
 All files use `note-type` frontmatter for identification.
+
+#### File Explorer Color Coding
+- **Root MOC folders**: Blue/purple gradient background with blue left border
+- **Sub-MOC folders**: Green gradient background with green left border
+- **Plugin subfolders** (Notes/Resources/Prompts): Subtle colored borders
+- **Dark theme support**: Automatically adjusted opacity and colors
 
 ### Configuration
 - **Plugin ID**: `moc-system-plugin`
@@ -40,15 +47,17 @@ All files use `note-type` frontmatter for identification.
 MOCs use `#moc` frontmatter tag and display only populated sections in order: MOCs → Notes → Resources → Prompts.
 
 ### Prompt System
+- **Hierarchical Structure**: Each prompt gets its own dedicated subfolder within MOC/Prompts/
 - **Hub**: Main prompt note with iteration links and `llm-links` code block
-- **Iterations**: Versioned files (v1, v2, etc.) with optional descriptions
+- **Iterations**: Versioned files (v1, v2, etc.) with optional descriptions, all contained within the prompt's subfolder
+- **Structure**: `MOC/Prompts/PromptName/🤖 PromptName.md` (hub) and `🤖 PromptName v1.md` (iterations)
 
 ## Features
 
 ### Commands (Full Feature Set)
-1. **Create MOC or add content** - Context-aware creation (root MOC vs sub-items)
+1. **Create MOC or add content** - Context-aware creation with optional prompt creation (root MOC vs sub-items)
 2. **Reorganize MOC** - Move MOCs between root/sub levels and different parents
-3. **Duplicate prompt iteration** - Version control for prompt iterations  
+3. **Duplicate prompt iteration** - Version control for prompt iterations with hierarchical subfolder support
 4. **Open all LLM links** - Batch open URLs from prompt hub
 5. **Update vault to latest system** - Automated modernization of existing files
 6. **Cleanup MOC system files** - Safe removal of plugin-created files
@@ -56,8 +65,10 @@ MOCs use `#moc` frontmatter tag and display only populated sections in order: MO
 ### Core Systems
 - **Random Generation**: Random Unicode emojis for MOCs
 - **Type Identification**: Fixed emoji prefixes for each file type
+- **Visual Enhancement**: CSS-based color coding for MOC folders in file explorer
 - **Modal System**: Multiple specialized modals for different operations
-- **Hierarchical Organization**: Each MOC gets its own folder with subfolders
+- **Hierarchical Organization**: Each MOC gets its own folder with subfolders; prompts get dedicated subfolders
+- **Enhanced MOC Creation**: Integrated workflow for creating MOCs with optional prompts
 - **Reorganization Engine**: Full MOC hierarchy management with circular dependency detection
 - **Vault Modernization**: Automated updates for legacy file structures
 
@@ -97,7 +108,7 @@ export default class MOCSystemPlugin extends Plugin {
 - `createSubMOC()`: Creates sub-MOC within parent folder
 - `createNote()`: Creates note in MOC's Notes subfolder
 - `createResource()`: Creates resource in MOC's Resources subfolder
-- `createPrompt()`: Creates prompt hub and first iteration
+- `createPrompt()`: Creates prompt hub and first iteration in dedicated subfolder
 - `ensureMOCFolderStructure()`: Creates complete folder hierarchy
 
 #### MOC Section Management
@@ -106,8 +117,8 @@ export default class MOCSystemPlugin extends Plugin {
 - `findSectionEnd()`: Locates section boundaries in markdown
 
 #### Prompt Management
-- `duplicatePromptIteration()`: Creates new versioned iteration
-- `updatePromptHub()`: Updates hub with new iteration links
+- `duplicatePromptIteration()`: Creates new versioned iteration in prompt's subfolder
+- `updatePromptHub()`: Updates hub with new iteration links (works with subfolder structure)
 - `openLLMLinks()`: Opens all URLs from llm-links code blocks
 
 #### MOC Reorganization System
@@ -137,6 +148,8 @@ export default class MOCSystemPlugin extends Plugin {
 - `needsFolderMigration()`: Checks if file needs structure update
 - `detectFileType()`: Determines file type from path/name
 - `getAllMOCs()`: Returns all MOC files in vault
+- `loadStyles()`: Loads and injects CSS for visual enhancements
+- `removeStyles()`: Removes injected CSS on plugin unload
 
 ### Random Generation System
 - `getRandomEmoji()`: Selects from 4 Unicode emoji ranges
@@ -149,9 +162,9 @@ The plugin uses multiple specialized modal classes:
 - **Purpose**: Displays vault update plan and confirms execution
 - **Features**: Update summary, file list, confirmation workflow
 
-#### CreateMOCModal (lines 1079-1106)
-- **Purpose**: Creates new root MOCs
-- **Features**: Simple text input with validation
+#### CreateMOCModal (lines 1453-1545)
+- **Purpose**: Creates new root MOCs with optional prompt creation
+- **Features**: MOC name input, checkbox for prompt creation, optional prompt name input with smart defaults
 
 #### AddToMOCModal (lines 1108-1141)
 - **Purpose**: Context-aware content addition to existing MOCs
@@ -183,22 +196,27 @@ The plugin uses multiple specialized modal classes:
 
 ## Technical Decisions (Full Implementation)
 
-1. **Comprehensive feature set**: ~1372 lines with complete functionality
+1. **Comprehensive feature set**: ~1540 lines with complete functionality
 2. **Multiple specialized modals**: Different modals for each operation type
 3. **Context-aware interfaces**: Smart modal selection based on current state
-4. **Full reorganization system**: Complete MOC hierarchy management
-5. **Vault modernization**: Automated updates for legacy structures
-6. **Circular dependency detection**: Prevents invalid MOC relationships
-7. **Event-driven cleanup**: Automatic broken link removal on file deletion
-8. **Complete command set**: All creation, organization, and maintenance features
+4. **Visual enhancement system**: CSS-based file explorer styling with automatic loading/unloading
+5. **Enhanced prompt organization**: Hierarchical subfolder structure for better prompt management
+6. **Integrated MOC creation workflow**: Optional prompt creation during MOC creation
+7. **Full reorganization system**: Complete MOC hierarchy management
+8. **Vault modernization**: Automated updates for legacy structures
+9. **Circular dependency detection**: Prevents invalid MOC relationships
+10. **Event-driven cleanup**: Automatic broken link removal on file deletion
+11. **Complete command set**: All creation, organization, and maintenance features
 
 ## Current Status
 
 **Full-Featured Implementation** - Complete system with all advanced features:
 - Context-aware creation (root MOC, sub-MOC, note, resource, prompt)
-- Hierarchical folder structure (each MOC has own folder)
+- Enhanced MOC creation with optional prompt integration
+- Hierarchical folder structure (each MOC has own folder; prompts get dedicated subfolders)
+- Visual color-coding system for MOC folders in file explorer
 - Random emojis for all MOCs
-- Prompt iteration duplication with hub auto-update
+- Prompt iteration duplication with hierarchical subfolder support
 - LLM links batch opening
 - MOC reorganization system (promote/demote, move between parents)
 - Vault update system (automatic modernization of existing files)
@@ -206,7 +224,7 @@ The plugin uses multiple specialized modal classes:
 - Circular dependency detection
 - Broken link cleanup on file deletion
 
-**Architecture**: Full-featured implementation (~1370 lines) with comprehensive modal system, reorganization capabilities, and vault maintenance tools.
+**Architecture**: Full-featured implementation (~1540 lines) with comprehensive modal system, visual enhancements, reorganization capabilities, and vault maintenance tools.
 
 ## History
 
@@ -231,7 +249,13 @@ The plugin uses multiple specialized modal classes:
 9. **Color System Removal & Documentation Update** - Removed all color/styling functionality and added comprehensive code documentation
 
 ### Latest Major Change
-**Full Implementation Restore (2025-06-21)**: Restored the complete feature set with all advanced capabilities (~1370 lines). Includes full MOC reorganization system, comprehensive vault update capabilities, multiple specialized modals, circular dependency detection, and complete maintenance tools. Plugin now provides the full workflow: context-aware creation, complete reorganization system, prompt iteration management, vault modernization, LLM link handling, and comprehensive cleanup.
+**Enhanced User Experience Update (2025-06-21)**: Added three major improvements to enhance the MOC system workflow (~1540 lines):
+
+1. **MOC Creation with Optional Prompt**: Enhanced the CreateMOCModal to include a checkbox for creating a prompt alongside the MOC. The prompt name intelligently defaults to the MOC name (without "MOC" suffix) if not specified, streamlining the creation workflow.
+
+2. **Visual File Explorer Enhancement**: Implemented comprehensive CSS-based color coding system for MOC folders in the file explorer. Root MOCs get blue/purple styling, sub-MOCs get green styling, and plugin subfolders have subtle colored borders. Includes full dark theme support with automatic style loading/unloading.
+
+3. **Hierarchical Prompt Organization**: Redesigned the prompt system so each prompt gets its own dedicated subfolder within the Prompts folder. Structure changed from flat `MOC/Prompts/files` to hierarchical `MOC/Prompts/PromptName/files`, providing better organization and preventing naming conflicts between different prompts and their iterations.
 
 ## Running Issue Log
 
