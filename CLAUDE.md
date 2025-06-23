@@ -12,8 +12,8 @@ Custom Obsidian plugin for automating a MOC (Map of Content) based note-taking s
 ## Project Structure
 
 ### Core Files
-- **`main.ts`** - Full implementation (~1540 lines) with comprehensive documentation
-- **`styles.css`** - Visual styling for MOC folders in file explorer
+- **`main.ts`** - Full implementation (1,926 lines) with comprehensive documentation
+- **`styles.css`** - Base styling for MOC folders in file explorer with dynamic color system
 - **`manifest.json`** - Plugin metadata and compatibility
 - **`package.json`** - Dependencies and build scripts
 - **Other**: TypeScript config, build config, documentation files
@@ -24,7 +24,7 @@ Custom Obsidian plugin for automating a MOC (Map of Content) based note-taking s
 Each MOC has its own folder containing the MOC file and subfolders for Notes/, Resources/, and Prompts/. Sub-MOCs nest within parent folders.
 
 ### Visual System
-- **MOCs**: Random Unicode emoji prefix with color-coded folder styling
+- **MOCs**: Random Unicode emoji prefix with unique color-coded folder styling
 - **Notes**: 📝 prefix
 - **Resources**: 📁 prefix
 - **Prompts**: 🤖 prefix
@@ -32,10 +32,11 @@ Each MOC has its own folder containing the MOC file and subfolders for Notes/, R
 All files use `note-type` frontmatter for identification.
 
 #### File Explorer Color Coding
-- **Root MOC folders**: Blue/purple gradient background with blue left border
-- **Sub-MOC folders**: Green gradient background with green left border
-- **Plugin subfolders** (Notes/Resources/Prompts): Subtle colored borders
-- **Dark theme support**: Automatically adjusted opacity and colors
+- **Each MOC folder**: Gets a unique HSL color stored in frontmatter (moc-hue, moc-saturation, moc-lightness)
+- **Dynamic CSS**: Individual color rules generated for each MOC folder path
+- **Theme variants**: Separate light-color and dark-color values for optimal theme compatibility
+- **Plugin subfolders** (Notes/Resources/Prompts): Subtle colored borders for organization
+- **Automatic updates**: Colors regenerate when MOCs are moved or reorganized
 
 ### Configuration
 - **Plugin ID**: `moc-system-plugin`
@@ -150,8 +151,10 @@ export default class MOCSystemPlugin extends Plugin {
 - `needsFolderMigration()`: Checks if file needs structure update
 - `detectFileType()`: Determines file type from path/name
 - `getAllMOCs()`: Returns all MOC files in vault
-- `loadStyles()`: Loads and injects CSS for visual enhancements
-- `removeStyles()`: Removes injected CSS on plugin unload
+- `updateMOCStyles()`: Updates dynamic CSS with individual MOC colors
+- `generateMOCColorStyles()`: Creates CSS rules for each MOC folder
+- `generateRandomColor()`: Generates unique HSL colors with theme variants
+- `adjustColorOpacity()`: Modifies HSL colors for different opacities
 
 ### Random Generation System
 - `getRandomEmoji()`: Selects from 4 Unicode emoji ranges
@@ -160,48 +163,44 @@ export default class MOCSystemPlugin extends Plugin {
 
 The plugin uses multiple specialized modal classes:
 
-#### VaultUpdateModal (lines 1028-1077)
+#### VaultUpdateModal (lines 1493-1546)
 - **Purpose**: Displays vault update plan and confirms execution
 - **Features**: Update summary, file list, confirmation workflow
 
-#### CreateMOCModal (lines 1453-1545)
+#### CreateMOCModal (lines 1557-1654)
 - **Purpose**: Creates new root MOCs with optional prompt creation
 - **Features**: MOC name input, checkbox for prompt creation, optional prompt name input with smart defaults
 
-#### AddToMOCModal (lines 1108-1141)
+#### AddToMOCModal (lines 1657-1690)
 - **Purpose**: Context-aware content addition to existing MOCs
 - **Features**: Button-based selection of content type (Sub-MOC, Note, Resource, Prompt)
 
-#### CreateItemModal (lines 1143-1174)
+#### CreateItemModal (lines 1693-1724)
 - **Purpose**: Generic item creation with name input
 - **Features**: Customizable for different item types
 
-#### PromptDescriptionModal (lines 1176-1210)
+#### PromptDescriptionModal (lines 1727-1761)
 - **Purpose**: Optional description input for prompt iterations
 - **Features**: Skip option, Enter key support
 
-#### CleanupConfirmationModal (lines 1212-1244)
+#### CleanupConfirmationModal (lines 1764-1796)
 - **Purpose**: Confirms deletion of all plugin files
 - **Features**: File list display, safety warnings
 
-#### ReorganizeMOCModal (lines 1246-1297)
+#### ReorganizeMOCModal (lines 1799-1850)
 - **Purpose**: MOC reorganization options based on context
 - **Features**: Different options for root vs sub-MOCs
 
-#### CreateParentMOCModal (lines 1299-1334)
-- **Purpose**: Creates new parent MOC for reorganization
-- **Features**: Name input with action confirmation
-
-#### SelectParentMOCModal (lines 1336-1372)
+#### SelectParentMOCModal (lines 1891-1927)
 - **Purpose**: Selects existing parent for MOC reorganization
 - **Features**: Scrollable list, circular dependency prevention
 
 ## Technical Decisions (Full Implementation)
 
-1. **Comprehensive feature set**: ~1540 lines with complete functionality
+1. **Comprehensive feature set**: 1,926 lines with complete functionality
 2. **Multiple specialized modals**: Different modals for each operation type
 3. **Context-aware interfaces**: Smart modal selection based on current state
-4. **Visual enhancement system**: CSS-based file explorer styling with automatic loading/unloading
+4. **Dynamic color system**: Individual HSL color assignment for each MOC with CSS generation
 5. **Enhanced prompt organization**: Hierarchical subfolder structure for better prompt management
 6. **Integrated MOC creation workflow**: Optional prompt creation during MOC creation
 7. **Full reorganization system**: Complete MOC hierarchy management
@@ -216,7 +215,7 @@ The plugin uses multiple specialized modal classes:
 - Context-aware creation (root MOC, sub-MOC, note, resource, prompt)
 - Enhanced MOC creation with optional prompt integration
 - Hierarchical folder structure (each MOC has own folder; prompts get dedicated subfolders)
-- Visual color-coding system for MOC folders in file explorer
+- Unique color system for each MOC folder with dynamic CSS generation
 - Random emojis for all MOCs
 - Prompt iteration duplication with hierarchical subfolder support
 - LLM links batch opening
@@ -226,7 +225,7 @@ The plugin uses multiple specialized modal classes:
 - Circular dependency detection
 - Broken link cleanup on file deletion
 
-**Architecture**: Full-featured implementation (~1540 lines) with comprehensive modal system, visual enhancements, reorganization capabilities, and vault maintenance tools.
+**Architecture**: Full-featured implementation (1,926 lines) with comprehensive modal system, unique color system, reorganization capabilities, and vault maintenance tools.
 
 ## History
 
@@ -244,11 +243,9 @@ The plugin uses multiple specialized modal classes:
 
 6. **Hierarchical Folder Structure** - Major architectural change where each MOC gets its own folder with subfolders, providing better organization and scalability
 
-7. **Lean Rewrite** - Massive code reduction from ~2800 lines to ~220 lines, removing legacy systems, complex modals, reorganization features, and vault update system while retaining all core functionality
+7. **Unique Color System Implementation** - Added individual HSL color assignment for each MOC folder with dynamic CSS generation
 
-8. **Full Implementation Restore** - Reverted to complete feature set with all advanced capabilities restored
-
-9. **Color System Removal & Documentation Update** - Removed all color/styling functionality and added comprehensive code documentation
+8. **Code Documentation Enhancement** - Added comprehensive JSDoc comments throughout the codebase following TypeScript standards
 
 ### Latest Major Change
 **Prompt Hub Restructuring (2025-06-23)**: Reorganized prompt system for improved accessibility and tidiness:
@@ -263,88 +260,23 @@ The plugin uses multiple specialized modal classes:
 
 5. **Documentation Updates**: Updated all prompt system documentation and method comments to reflect the new organizational structure.
 
-**Previous Major Change - Unique MOC Color System Implementation (2025-06-23)**: Added comprehensive individual color assignment for each MOC folder with complete timing fixes:
+**Current Implementation Features**:
+- **Unique Color System**: Each MOC gets a unique HSL color stored in frontmatter with dynamic CSS generation
+- **Theme Compatibility**: Separate light-color and dark-color values for optimal theme support
+- **Vault Modernization**: Enhanced update system assigns colors to existing MOCs during upgrades
+- **Automatic Regeneration**: CSS updates when MOCs are moved or reorganized
+- **Professional Documentation**: TypeScript standard JSDoc comments throughout codebase
 
-1. **Random Color Generation**: Each MOC now gets a unique HSL color assigned during creation, stored in frontmatter with both light and dark theme variants for optimal visibility.
+## Development Notes
 
-2. **Dynamic CSS System**: Implemented dynamic CSS generation that creates specific styling rules for each MOC folder based on its unique color, replacing the previous fixed color scheme.
+The plugin is currently a complete, full-featured implementation with all advanced capabilities including:
+- Dynamic color system with unique HSL colors for each MOC folder
+- Comprehensive modal system for all operations
+- Complete hierarchical folder structure with automated management
+- Vault modernization system for updating legacy structures
+- All reorganization features (promote/demote MOCs, move between parents)
+- Prompt iteration system with hub-based organization
+- Circular dependency detection and prevention
+- Automated cleanup and maintenance tools
 
-3. **Vault Update Integration**: Enhanced the vault update system to assign unique colors to existing MOCs that don't have color information, ensuring all MOCs benefit from the visual identification system.
-
-4. **Persistent Color Storage**: Colors are stored in MOC frontmatter with detailed HSL values (hue, saturation, lightness) and pre-calculated theme-specific color strings for efficient CSS generation.
-
-5. **Automatic Style Updates**: The system automatically regenerates CSS when MOCs are created, moved, or reorganized to ensure folder path changes are reflected in the styling.
-
-6. **Reliable Startup Loading**: Fixed timing issues to ensure MOC colors apply immediately when Obsidian starts, using both timeout delays and layout-ready event listeners for maximum reliability.
-
-7. **Cross-Platform Path Handling**: Resolved CSS path loading issues by properly handling folder name vs plugin ID mismatches.
-
-**Code Documentation Cleanup (2025-06-23)**: Updated plugin comments to follow standard TypeScript conventions:
-- Removed verbose "WHY:" explanations from all comments throughout the codebase
-- Simplified JSDoc comments to concise, standard format with essential @param and @returns information
-- Converted multi-line explanatory comments to brief, focused descriptions
-- Maintained code functionality while improving readability and following industry standards
-- All comments now follow conventional TypeScript documentation practices
-
-## Running Issue Log
-
-### Duplicate Prompt Iteration Command (2025-06-18)
-**Issue**: "Duplicate Prompt Iteration" hotkey stopped working after hierarchical folder structure implementation.
-**Root Cause**: `isPromptIteration()` and `isPromptHub()` methods were still using old flat folder logic, checking if file paths started with "Prompts" folder.
-**Fix**: Updated both methods to check if the file's parent folder name equals "Prompts" instead of checking the full path. This correctly identifies prompt files within the hierarchical structure where prompts are in nested folders like `MOCName/Prompts/...`.
-**Resolution**: Changed from `file.path.startsWith(FOLDERS.Prompts)` to `file.parent?.name === FOLDERS.Prompts` in both methods.
-
-### ESLint Code Quality Issues (2025-06-19)
-**Issue**: Multiple ESLint errors in main.ts causing potential runtime issues and code quality problems.
-**Root Cause**: Accumulation of 17 different ESLint violations including unused variables, unsafe non-null assertions, mixed indentation, and other code quality issues.
-**Fix**: Comprehensive cleanup of all ESLint errors:
-- Removed unused imports (`MarkdownView`) and variables (`currentVersion`, `mocFolder`, `originalMocPath`, `noteType`, `fileRenamed`)
-- Changed empty interface to type alias (`interface PluginSettings {}` → `type PluginSettings = Record<string, never>`)
-- Fixed mixed spaces/tabs indentation inconsistencies
-- Changed `let` to `const` for variables that are never reassigned
-- Added Unicode flag to regex pattern for proper emoji handling
-- Replaced unsafe non-null assertions with proper null checks
-**Resolution**: All 17 ESLint errors resolved, improving code stability and maintainability.
-
-### Lean Rewrite Implementation (2025-06-19)
-**Issue**: Plugin had grown to ~2800 lines with extensive legacy support, complex modal systems, and features that were rarely used.
-**Decision**: Major code reduction focusing on core workflow only.
-**Implementation**: Complete rewrite reducing codebase to ~220 lines:
-- Removed all legacy compatibility systems (hash-based colors, old folder structures)
-- Eliminated complex modal chains in favor of single InputModal
-- Removed MOC reorganization features (moving between root/sub levels)
-- Removed vault update system (automatic modernization)
-- Removed event handling for UI updates and styling
-- Kept only essential commands: context creation, prompt iteration, LLM links, cleanup
-- Simplified all creation methods to use direct input parsing ("note Name", "prompt Helper", "sub Project")
-**Result**: Dramatically cleaner codebase focused purely on the core MOC workflow, easier maintenance, and faster performance.
-
-### Unused styles.css File Cleanup (2025-06-19)
-**Issue**: Discovered leftover styles.css file in project directory that wasn't being used by the plugin.
-**Root Cause**: File remained from earlier debugging/development phase but wasn't referenced or needed in the lean rewrite implementation.
-**Fix**: Removed unused styles.css file and updated CLAUDE.md to reflect removal from Core Files section.
-**Resolution**: File deleted and documentation updated to maintain accurate project structure documentation.
-
-### Color System Removal & Code Documentation (2025-06-21)
-**Issue**: Color/styling system didn't work as intended and needed removal. Code lacked comprehensive documentation per new coding standards.
-**Root Cause**: Color styling system was partially implemented but non-functional. Code was written before documentation standards were established.
-**Fix**: Complete removal of all color-related code and comprehensive documentation update:
-- Removed `generateRandomColor()` method entirely
-- Removed color properties from MOC frontmatter (root-moc-color, light-color, dark-color)
-- Removed color-related update logic in vault modernization
-- Removed CSS class references from NOTE_TYPES (kept emoji only)
-- Added detailed JSDoc comments to all functions explaining purpose, parameters, and behavior
-- Added class-level documentation for the main plugin class and all modal classes
-- Added section headers with explanatory comments throughout the codebase
-**Resolution**: Plugin now has clean, well-documented code without non-functional color system. All functions have comprehensive comments explaining their purpose and implementation details.
-
-### Comment Standards Update (2025-06-23)
-**Issue**: Plugin comments were overly verbose with extensive "WHY:" explanations that didn't follow standard TypeScript documentation practices.
-**Root Cause**: Comments were written with excessive explanatory detail that made the codebase harder to read and maintain.
-**Fix**: Comprehensive comment cleanup to follow industry standards:
-- Removed all verbose "WHY:" explanation blocks throughout the codebase
-- Simplified JSDoc comments to standard format with essential information only
-- Converted multi-line explanatory comments to concise, focused descriptions
-- Fixed malformed comment block that was causing 786 TypeScript compilation errors
-- Maintained all code functionality while dramatically improving readability
-**Resolution**: Plugin now follows conventional TypeScript documentation practices with clean, professional comments that are easy to read and maintain.
+The codebase follows TypeScript standards with comprehensive JSDoc documentation throughout.
