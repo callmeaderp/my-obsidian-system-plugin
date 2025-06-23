@@ -631,13 +631,13 @@ dark-color: ${colorInfo.darkColor}
 		const promptSubfolder = `${promptsFolder}/${name}`;
 		const iterationBasename = `${NOTE_TYPES.Prompts.emoji} ${name} v1`;
 
-		// Ensure the prompt's dedicated subfolder exists
+		// Ensure the prompt's dedicated subfolder exists for iterations
 		if (!this.app.vault.getAbstractFileByPath(promptSubfolder)) {
 			await this.app.vault.createFolder(promptSubfolder);
 		}
 
-		// Create prompt hub in the subfolder
-		const hubFileName = `${promptSubfolder}/${NOTE_TYPES.Prompts.emoji} ${name}.md`;
+		// Create prompt hub directly in the Prompts folder for easy access
+		const hubFileName = `${promptsFolder}/${NOTE_TYPES.Prompts.emoji} ${name}.md`;
 		const hubContent = `---
 note-type: prompt
 ---
@@ -657,7 +657,7 @@ note-type: prompt
 		
 		const hubFile = await this.app.vault.create(normalizePath(hubFileName), hubContent);
 		
-		// Create first iteration in the same subfolder
+		// Create first iteration in the dedicated subfolder for organization
 		const iterationFileName = `${promptSubfolder}/${iterationBasename}.md`;
 		const iterationContent = `---\nnote-type: prompt\n---\n`;
 		await this.app.vault.create(normalizePath(iterationFileName), iterationContent);
@@ -943,14 +943,17 @@ note-type: prompt
 	 * 
 	 * The hub file maintains a list of all iterations in its "## Iterations" section.
 	 * This method finds that section and appends the new iteration link.
-	 * Now works with the new subfolder structure where hubs are in dedicated subfolders.
+	 * Hub files are located directly in the MOC's Prompts folder, while iterations
+	 * are organized in dedicated subfolders named after the prompt.
 	 * 
 	 * @param baseName The base name of the prompt (without emoji or version)
 	 * @param newIteration The newly created iteration file to link
-	 * @param promptSubfolderPath The path to the prompt's dedicated subfolder
+	 * @param promptSubfolderPath The path to the prompt's dedicated subfolder containing iterations
 	 */
 	async updatePromptHub(baseName: string, newIteration: TFile, promptSubfolderPath: string) {
-		const hubPath = `${promptSubfolderPath}/${NOTE_TYPES.Prompts.emoji} ${baseName}.md`;
+		// Hub is now in the parent Prompts folder, not in the subfolder
+		const promptsFolder = promptSubfolderPath.substring(0, promptSubfolderPath.lastIndexOf('/'));
+		const hubPath = `${promptsFolder}/${NOTE_TYPES.Prompts.emoji} ${baseName}.md`;
 		const hubFile = this.app.vault.getAbstractFileByPath(normalizePath(hubPath));
 		
 		if (hubFile instanceof TFile) {
@@ -1311,6 +1314,12 @@ note-type: prompt
 			updates.push(`Add ${NOTE_TYPES.Prompts.emoji} emoji prefix`);
 		}
 		
+		// Check 5: Prompt hub migration to new structure
+		// WHY: New prompt structure requires hubs to be in MOC/Prompts/ folder instead of subfolders
+		if (noteType === 'prompt' && this.needsPromptHubMigration(file)) {
+			updates.push('Migrate prompt hub to new location in Prompts folder');
+		}
+		
 		return updates;
 	}
 
@@ -1372,6 +1381,8 @@ note-type: prompt
 					currentFile = await this.migrateToHierarchicalStructure(currentFile);
 				} else if (update.includes('emoji prefix') || update.includes('MOC suffix')) {
 					currentFile = await this.updateFileName(currentFile, update);
+				} else if (update.includes('prompt hub to new location')) {
+					currentFile = await this.migratePromptHub(currentFile);
 				} else if (update.includes('color information')) {
 					// Generate and assign unique color information to the MOC
 					// WHY: This provides each existing MOC with the same color treatment as new ones
@@ -1430,6 +1441,45 @@ note-type: prompt
 		// We log this, but don't perform an action.
 		console.warn(`Cannot auto-migrate ${file.path}. Please manually reorganize it into a parent MOC.`);
 		return file;
+	}
+
+	/**
+	 * Migrates a prompt hub from a subfolder to the Prompts folder.
+	 * 
+	 * The new prompt structure places hub files directly in MOC/Prompts/ for easy access,
+	 * while keeping iterations organized in subfolders. This method moves existing hubs
+	 * from their current subfolder location to the parent Prompts folder.
+	 * 
+	 * WHY: Hub files in the main Prompts folder are more accessible while iterations
+	 * remain organized in dedicated subfolders for tidiness.
+	 * 
+	 * @param file The prompt hub file to migrate
+	 * @returns The file at its new location
+	 */
+	private async migratePromptHub(file: TFile): Promise<TFile> {
+		// Get the current location info
+		const currentFolder = file.parent;
+		if (!currentFolder) return file;
+		
+		// The grandparent should be the Prompts folder
+		const promptsFolder = currentFolder.parent;
+		if (!promptsFolder || promptsFolder.name !== FOLDERS.Prompts) {
+			console.warn(`Cannot migrate prompt hub ${file.path}: expected to be in Prompts subfolder`);
+			return file;
+		}
+		
+		// Move the hub file to the Prompts folder
+		const newPath = normalizePath(`${promptsFolder.path}/${file.name}`);
+		
+		try {
+			await this.app.vault.rename(file, newPath);
+			new Notice(`Migrated prompt hub: ${file.basename}`);
+			return this.app.vault.getAbstractFileByPath(newPath) as TFile;
+		} catch (error) {
+			console.error(`Failed to migrate prompt hub ${file.path}:`, error);
+			new Notice(`Failed to migrate prompt hub: ${file.basename}`);
+			return file;
+		}
 	}
 
 	/**
@@ -1604,6 +1654,40 @@ note-type: prompt
 		if (this.isMOC(file) && this.isRootMOC(file) && file.parent?.isRoot()) {
 			return true;
 		}
+		return false;
+	}
+
+	/**
+	 * Checks if a prompt hub file needs migration to the new structure.
+	 * 
+	 * In the new structure, prompt hubs should be directly in MOC/Prompts/ folder,
+	 * not in subfolders like MOC/Prompts/PromptName/. This method identifies
+	 * prompt hubs that are currently in subfolders and need to be moved.
+	 * 
+	 * WHY: The new structure puts hubs at the top level for easier access while
+	 * keeping iterations organized in subfolders.
+	 * 
+	 * @param file The file to check
+	 * @returns true if the file is a prompt hub in a subfolder that needs migration
+	 */
+	private needsPromptHubMigration(file: TFile): boolean {
+		// Check if this is a prompt hub (has prompt note-type but no version number)
+		if (!this.isPromptHub(file)) return false;
+		
+		// Check if it's currently in a prompt subfolder structure
+		const parentFolder = file.parent;
+		if (!parentFolder) return false;
+		
+		// If the parent folder is named "Prompts", it's already in the correct location
+		if (parentFolder.name === FOLDERS.Prompts) return false;
+		
+		// If the parent folder's parent is named "Prompts", then this hub is in a subfolder
+		// and needs to be moved up to the Prompts folder
+		const grandparentFolder = parentFolder.parent;
+		if (grandparentFolder && grandparentFolder.name === FOLDERS.Prompts) {
+			return true;
+		}
+		
 		return false;
 	}
 

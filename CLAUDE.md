@@ -47,10 +47,10 @@ All files use `note-type` frontmatter for identification.
 MOCs use `#moc` frontmatter tag and display only populated sections in order: MOCs → Notes → Resources → Prompts.
 
 ### Prompt System
-- **Hierarchical Structure**: Each prompt gets its own dedicated subfolder within MOC/Prompts/
-- **Hub**: Main prompt note with iteration links and `llm-links` code block
-- **Iterations**: Versioned files (v1, v2, etc.) with optional descriptions, all contained within the prompt's subfolder
-- **Structure**: `MOC/Prompts/PromptName/🤖 PromptName.md` (hub) and `🤖 PromptName v1.md` (iterations)
+- **Hierarchical Structure**: Each prompt has a hub in the MOC's Prompts folder and iterations organized in a dedicated subfolder
+- **Hub**: Main prompt note located directly in `MOC/Prompts/` with iteration links and `llm-links` code block
+- **Iterations**: Versioned files (v1, v2, etc.) with optional descriptions, organized in a dedicated subfolder named after the prompt
+- **Structure**: `MOC/Prompts/🤖 PromptName.md` (hub) and `MOC/Prompts/PromptName/🤖 PromptName v1.md` (iterations)
 
 ## Features
 
@@ -132,10 +132,12 @@ export default class MOCSystemPlugin extends Plugin {
 #### Vault Update & Maintenance
 - `updateVaultToLatestSystem()`: Initiates vault modernization
 - `analyzeVaultForUpdates()`: Scans vault for needed updates
-- `detectRequiredUpdates()`: Identifies specific file updates needed
+- `detectRequiredUpdates()`: Identifies specific file updates needed (now includes prompt hub migration detection)
 - `executeUpdatePlan()`: Applies all planned updates
 - `updateFile()`: Applies specific updates to individual files
 - `migrateToHierarchicalStructure()`: Moves files to new structure
+- `migratePromptHub()`: Moves prompt hubs from subfolders to Prompts folder
+- `needsPromptHubMigration()`: Detects prompt hubs needing migration to new structure
 - `updateFileName()`: Adds required prefixes/suffixes
 - `cleanupMOCSystem()`: Removes all plugin files
 - `cleanupBrokenLinks()`: Removes broken links after file deletion
@@ -219,7 +221,7 @@ The plugin uses multiple specialized modal classes:
 - Prompt iteration duplication with hierarchical subfolder support
 - LLM links batch opening
 - MOC reorganization system (promote/demote, move between parents)
-- Vault update system (automatic modernization of existing files)
+- Vault update system (automatic modernization of existing files including prompt hub migration)
 - System cleanup (delete all plugin files)
 - Circular dependency detection
 - Broken link cleanup on file deletion
@@ -249,7 +251,19 @@ The plugin uses multiple specialized modal classes:
 9. **Color System Removal & Documentation Update** - Removed all color/styling functionality and added comprehensive code documentation
 
 ### Latest Major Change
-**Unique MOC Color System Implementation (2025-06-23)**: Added comprehensive individual color assignment for each MOC folder with complete timing fixes:
+**Prompt Hub Restructuring (2025-06-23)**: Reorganized prompt system for improved accessibility and tidiness:
+
+1. **Hub Location Change**: Moved prompt hub files from subfolders (`MOC/Prompts/PromptName/🤖 PromptName.md`) to main Prompts folder (`MOC/Prompts/🤖 PromptName.md`) for easier access.
+
+2. **Iteration Organization**: Kept prompt iterations organized in dedicated subfolders (`MOC/Prompts/PromptName/🤖 PromptName v1.md`) for tidiness and better organization.
+
+3. **Migration System**: Enhanced vault update system with automatic detection and migration of existing prompt hubs from old subfolder structure to new direct placement in Prompts folder.
+
+4. **Method Updates**: Modified `createPrompt()`, `updatePromptHub()`, and `migratePromptHub()` methods to support the new structure while maintaining full compatibility with existing workflows.
+
+5. **Documentation Updates**: Updated all prompt system documentation and method comments to reflect the new organizational structure.
+
+**Previous Major Change - Unique MOC Color System Implementation (2025-06-23)**: Added comprehensive individual color assignment for each MOC folder with complete timing fixes:
 
 1. **Random Color Generation**: Each MOC now gets a unique HSL color assigned during creation, stored in frontmatter with both light and dark theme variants for optimal visibility.
 
