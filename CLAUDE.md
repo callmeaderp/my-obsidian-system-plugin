@@ -119,7 +119,7 @@ export default class MOCSystemPlugin extends Plugin {
 
 #### Prompt Management
 - `duplicatePromptIteration()`: Creates new versioned iteration in prompt's subfolder
-- `updatePromptHub()`: Updates hub with new iteration links (works with subfolder structure)
+- `updatePromptHub()`: Updates hub with new iteration links
 - `openLLMLinks()`: Opens all URLs from llm-links code blocks
 
 #### MOC Reorganization System
@@ -133,7 +133,7 @@ export default class MOCSystemPlugin extends Plugin {
 #### Vault Update & Maintenance
 - `updateVaultToLatestSystem()`: Initiates vault modernization
 - `analyzeVaultForUpdates()`: Scans vault for needed updates
-- `detectRequiredUpdates()`: Identifies specific file updates needed (now includes prompt hub migration detection)
+- `detectRequiredUpdates()`: Identifies specific file updates needed
 - `executeUpdatePlan()`: Applies all planned updates
 - `updateFile()`: Applies specific updates to individual files
 - `migrateToHierarchicalStructure()`: Moves files to new structure
@@ -209,9 +209,9 @@ The plugin uses multiple specialized modal classes:
 10. **Event-driven cleanup**: Automatic broken link removal on file deletion
 11. **Complete command set**: All creation, organization, and maintenance features
 
-## Current Status
+## System Capabilities
 
-**Full-Featured Implementation** - Complete system with all advanced features:
+**Core Features**:
 - Context-aware creation (root MOC, sub-MOC, note, resource, prompt)
 - Enhanced MOC creation with optional prompt integration
 - Hierarchical folder structure (each MOC has own folder; prompts get dedicated subfolders)
@@ -220,63 +220,23 @@ The plugin uses multiple specialized modal classes:
 - Prompt iteration duplication with hierarchical subfolder support
 - LLM links batch opening
 - MOC reorganization system (promote/demote, move between parents)
-- Vault update system (automatic modernization of existing files including prompt hub migration)
+- Vault update system (automatic modernization of existing files)
 - System cleanup (delete all plugin files)
 - Circular dependency detection
 - Broken link cleanup on file deletion
 
-**Architecture**: Full-featured implementation (1,926 lines) with comprehensive modal system, unique color system, reorganization capabilities, and vault maintenance tools.
-
-## History
-
-### Key Milestones
-
-1. **Initial Implementation** - Core plugin with all basic features
-
-2. **Documentation Enhancement** - Complete CLAUDE.md overhaul with technical details
-
-3. **Vault Update System** - Automated modernization tool for entire vaults
-
-4. **MOC Reorganization** - Flexible hierarchy management with automatic updates
-
-5. **Bug Fixes** - Frontmatter corruption, broken links resolved
-
-6. **Hierarchical Folder Structure** - Major architectural change where each MOC gets its own folder with subfolders, providing better organization and scalability
-
-7. **Unique Color System Implementation** - Added individual HSL color assignment for each MOC folder with dynamic CSS generation
-
-8. **Code Documentation Enhancement** - Added comprehensive JSDoc comments throughout the codebase following TypeScript standards
-
-### Latest Major Change
-**Prompt Hub Restructuring (2025-06-23)**: Reorganized prompt system for improved accessibility and tidiness:
-
-1. **Hub Location Change**: Moved prompt hub files from subfolders (`MOC/Prompts/PromptName/🤖 PromptName.md`) to main Prompts folder (`MOC/Prompts/🤖 PromptName.md`) for easier access.
-
-2. **Iteration Organization**: Kept prompt iterations organized in dedicated subfolders (`MOC/Prompts/PromptName/🤖 PromptName v1.md`) for tidiness and better organization.
-
-3. **Migration System**: Enhanced vault update system with automatic detection and migration of existing prompt hubs from old subfolder structure to new direct placement in Prompts folder.
-
-4. **Method Updates**: Modified `createPrompt()`, `updatePromptHub()`, and `migratePromptHub()` methods to support the new structure while maintaining full compatibility with existing workflows.
-
-5. **Documentation Updates**: Updated all prompt system documentation and method comments to reflect the new organizational structure.
-
-**Current Implementation Features**:
-- **Unique Color System**: Each MOC gets a unique HSL color stored in frontmatter with dynamic CSS generation
-- **Theme Compatibility**: Separate light-color and dark-color values for optimal theme support
-- **Vault Modernization**: Enhanced update system assigns colors to existing MOCs during upgrades
-- **Automatic Regeneration**: CSS updates when MOCs are moved or reorganized
-- **Professional Documentation**: TypeScript standard JSDoc comments throughout codebase
-
 ## Development Notes
 
-The plugin is currently a complete, full-featured implementation with all advanced capabilities including:
+**Architecture**: Complete full-featured implementation with comprehensive modal system, dynamic color system, reorganization capabilities, and vault maintenance tools.
+
+**Code Quality**: Codebase follows TypeScript standards with comprehensive JSDoc documentation throughout.
+
+**Key Capabilities**:
 - Dynamic color system with unique HSL colors for each MOC folder
 - Comprehensive modal system for all operations
 - Complete hierarchical folder structure with automated management
 - Vault modernization system for updating legacy structures
-- All reorganization features (promote/demote MOCs, move between parents)
+- Full reorganization features (promote/demote MOCs, move between parents)
 - Prompt iteration system with hub-based organization
 - Circular dependency detection and prevention
 - Automated cleanup and maintenance tools
-
-The codebase follows TypeScript standards with comprehensive JSDoc documentation throughout.
