@@ -3,56 +3,20 @@
    ======================================================================= */
 
 /**
- * MOC Folder Styling
+ * Base MOC Folder Styling
  * 
- * Targets folders that follow the MOC naming pattern: "[emoji] [name] MOC"
- * Applies distinct visual styling to make MOC folders easily identifiable
- * in the file explorer sidebar.
+ * Provides base structure for MOC folders. Individual colors are applied
+ * dynamically through JavaScript-generated CSS rules based on each MOC's
+ * unique color stored in frontmatter.
  */
 
-/* MOC folder names in the file explorer */
+/* Base styling for all MOC folders */
 .nav-folder-title[data-path*=" MOC"] {
-    background: linear-gradient(135deg, 
-        rgba(99, 102, 241, 0.1) 0%, 
-        rgba(168, 85, 247, 0.1) 100%);
-    border-left: 3px solid #6366f1;
     border-radius: 4px;
     font-weight: 600;
     padding: 2px 6px;
     margin: 1px 0;
-}
-
-/* MOC folder names on hover */
-.nav-folder-title[data-path*=" MOC"]:hover {
-    background: linear-gradient(135deg, 
-        rgba(99, 102, 241, 0.2) 0%, 
-        rgba(168, 85, 247, 0.2) 100%);
-    border-left-color: #8b5cf6;
-}
-
-/* MOC folder icons */
-.nav-folder-title[data-path*=" MOC"] .nav-folder-collapse-indicator {
-    color: #6366f1;
-}
-
-/* Sub-MOC folders (nested within other MOC folders) */
-.nav-folder-title[data-path*=" MOC"][data-path*="/"] {
-    background: linear-gradient(135deg, 
-        rgba(16, 185, 129, 0.1) 0%, 
-        rgba(5, 150, 105, 0.1) 100%);
-    border-left-color: #10b981;
-}
-
-.nav-folder-title[data-path*=" MOC"][data-path*="/"]:hover {
-    background: linear-gradient(135deg, 
-        rgba(16, 185, 129, 0.2) 0%, 
-        rgba(5, 150, 105, 0.2) 100%);
-    border-left-color: #059669;
-}
-
-/* Sub-MOC folder icons */
-.nav-folder-title[data-path*=" MOC"][data-path*="/"] .nav-folder-collapse-indicator {
-    color: #10b981;
+    /* Individual colors will be applied by dynamic CSS */
 }
 
 /**
@@ -104,31 +68,9 @@
 }
 
 /**
- * Dark theme adjustments
+ * Dynamic color system
  * 
- * Ensures the styling works well in both light and dark themes
+ * Individual MOC folder colors are generated dynamically based on each MOC's
+ * unique color information stored in frontmatter. This ensures optimal
+ * theme compatibility and visual distinction between MOCs.
  */
-
-.theme-dark .nav-folder-title[data-path*=" MOC"] {
-    background: linear-gradient(135deg, 
-        rgba(99, 102, 241, 0.15) 0%, 
-        rgba(168, 85, 247, 0.15) 100%);
-}
-
-.theme-dark .nav-folder-title[data-path*=" MOC"]:hover {
-    background: linear-gradient(135deg, 
-        rgba(99, 102, 241, 0.25) 0%, 
-        rgba(168, 85, 247, 0.25) 100%);
-}
-
-.theme-dark .nav-folder-title[data-path*=" MOC"][data-path*="/"] {
-    background: linear-gradient(135deg, 
-        rgba(16, 185, 129, 0.15) 0%, 
-        rgba(5, 150, 105, 0.15) 100%);
-}
-
-.theme-dark .nav-folder-title[data-path*=" MOC"][data-path*="/"]:hover {
-    background: linear-gradient(135deg, 
-        rgba(16, 185, 129, 0.25) 0%, 
-        rgba(5, 150, 105, 0.25) 100%);
-}

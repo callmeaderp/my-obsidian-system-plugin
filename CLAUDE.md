@@ -249,13 +249,21 @@ The plugin uses multiple specialized modal classes:
 9. **Color System Removal & Documentation Update** - Removed all color/styling functionality and added comprehensive code documentation
 
 ### Latest Major Change
-**Enhanced User Experience Update (2025-06-21)**: Added three major improvements to enhance the MOC system workflow (~1540 lines):
+**Unique MOC Color System Implementation (2025-06-23)**: Added comprehensive individual color assignment for each MOC folder with complete timing fixes:
 
-1. **MOC Creation with Optional Prompt**: Enhanced the CreateMOCModal to include a checkbox for creating a prompt alongside the MOC. The prompt name intelligently defaults to the MOC name (without "MOC" suffix) if not specified, streamlining the creation workflow.
+1. **Random Color Generation**: Each MOC now gets a unique HSL color assigned during creation, stored in frontmatter with both light and dark theme variants for optimal visibility.
 
-2. **Visual File Explorer Enhancement**: Implemented comprehensive CSS-based color coding system for MOC folders in the file explorer. Root MOCs get blue/purple styling, sub-MOCs get green styling, and plugin subfolders have subtle colored borders. Includes full dark theme support with automatic style loading/unloading.
+2. **Dynamic CSS System**: Implemented dynamic CSS generation that creates specific styling rules for each MOC folder based on its unique color, replacing the previous fixed color scheme.
 
-3. **Hierarchical Prompt Organization**: Redesigned the prompt system so each prompt gets its own dedicated subfolder within the Prompts folder. Structure changed from flat `MOC/Prompts/files` to hierarchical `MOC/Prompts/PromptName/files`, providing better organization and preventing naming conflicts between different prompts and their iterations.
+3. **Vault Update Integration**: Enhanced the vault update system to assign unique colors to existing MOCs that don't have color information, ensuring all MOCs benefit from the visual identification system.
+
+4. **Persistent Color Storage**: Colors are stored in MOC frontmatter with detailed HSL values (hue, saturation, lightness) and pre-calculated theme-specific color strings for efficient CSS generation.
+
+5. **Automatic Style Updates**: The system automatically regenerates CSS when MOCs are created, moved, or reorganized to ensure folder path changes are reflected in the styling.
+
+6. **Reliable Startup Loading**: Fixed timing issues to ensure MOC colors apply immediately when Obsidian starts, using both timeout delays and layout-ready event listeners for maximum reliability.
+
+7. **Cross-Platform Path Handling**: Resolved CSS path loading issues by properly handling folder name vs plugin ID mismatches.
 
 **Code Documentation Update (2025-06-23)**: Major documentation enhancement to align with new global CLAUDE.md standards:
 - Added comprehensive "WHY" comments throughout the codebase explaining design decisions and technical choices

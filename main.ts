@@ -116,11 +116,26 @@ export default class MOCSystemPlugin extends Plugin {
 	 * Loads settings, registers commands, and sets up event listeners.
 	 * 
 	 * WHY: The initialization order matters - settings must load first as they may affect
-	 * other operations, then styles for immediate visual feedback, then commands become available.
+	 * other operations, then commands become available, then styles are loaded with a delay
+	 * to ensure Obsidian's file explorer and metadata cache are fully ready.
 	 */
 	async onload() {
 		await this.loadSettings();
-		await this.loadStyles();
+		
+		// Load initial styles with a delay to ensure Obsidian is fully ready
+		// WHY: The file explorer and metadata cache need time to initialize before
+		// we can properly scan for MOC files and apply their unique colors
+		setTimeout(async () => {
+			await this.updateMOCStyles();
+		}, 1000);
+
+		// Also listen for layout ready event for more reliable style loading
+		// WHY: This ensures styles are applied even if the timeout isn't sufficient
+		this.app.workspace.onLayoutReady(() => {
+			setTimeout(async () => {
+				await this.updateMOCStyles();
+			}, 500);
+		});
 
 		// --- Command Registration ---
 		// WHY: This is the primary command and comes first. Context-aware creation reduces
@@ -251,6 +266,142 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 	}
 
+	/**
+	 * Updates the CSS styles to apply unique colors to MOC folders.
+	 * 
+	 * This method:
+	 * 1. Scans all MOC files in the vault for color information
+	 * 2. Generates dynamic CSS rules for each MOC's unique color
+	 * 3. Combines base styles with individual MOC color styles
+	 * 4. Injects the updated styles into the document
+	 * 
+	 * WHY: Dynamic CSS generation allows each MOC folder to have its own unique color
+	 * while maintaining the base styling structure. Using data-path attributes allows
+	 * precise targeting of individual folders without affecting global styles.
+	 */
+	async updateMOCStyles() {
+		try {
+			// First load the base CSS from styles.css
+			// WHY: We use the actual folder name instead of manifest.id to handle cases where
+			// the folder name differs from the plugin ID in manifest.json
+			const cssPath = normalizePath(`${this.app.vault.configDir}/plugins/my-obsidian-system-plugin/styles.css`);
+			let baseCssContent = '';
+			try {
+				baseCssContent = await this.app.vault.adapter.read(cssPath);
+			} catch (error) {
+				console.warn('MOC System Plugin: Could not load base styles.css', error);
+			}
+
+			// Generate dynamic CSS for each MOC's unique color
+			const mocColorStyles = await this.generateMOCColorStyles();
+
+			// Combine base styles with dynamic MOC color styles
+			const combinedStyles = `${baseCssContent}\n\n/* ===== DYNAMIC MOC COLORS ===== */\n${mocColorStyles}`;
+
+			// Remove existing style element and create new one
+			if (this.styleElement) {
+				this.styleElement.remove();
+			}
+
+			this.styleElement = document.createElement('style');
+			this.styleElement.id = 'moc-system-plugin-styles';
+			this.styleElement.textContent = combinedStyles;
+			document.head.appendChild(this.styleElement);
+		} catch (error) {
+			console.error('MOC System Plugin: Error updating MOC styles', error);
+		}
+	}
+
+	/**
+	 * Generates CSS rules for individual MOC folder colors.
+	 * 
+	 * Scans all MOC files that have color information and creates specific CSS rules
+	 * for each folder path. Uses CSS attribute selectors to target exact folder paths
+	 * and applies the stored color information with appropriate opacity for backgrounds.
+	 * 
+	 * @returns CSS string containing all dynamic MOC color rules
+	 */
+	private async generateMOCColorStyles(): Promise<string> {
+		const allMOCs = await this.getAllMOCs();
+		const colorStyles: string[] = [];
+
+		for (const moc of allMOCs) {
+			const cache = this.app.metadataCache.getFileCache(moc);
+			const frontmatter = cache?.frontmatter;
+
+			// Check if this MOC has color information
+			if (frontmatter?.['light-color'] && frontmatter?.['dark-color'] && moc.parent) {
+				const folderPath = moc.parent.path;
+				const lightColor = frontmatter['light-color'];
+				const darkColor = frontmatter['dark-color'];
+				const isRootMOC = frontmatter['root-moc-color'] === true;
+
+				// WHY: We escape the folder path for CSS selector safety and use exact attribute matching
+				// to ensure we only target the specific folder. The opacity values provide subtle
+				// background colors that don't interfere with text readability.
+				const escapedPath = folderPath.replace(/['"\\]/g, '\\$&');
+				
+				// Generate CSS for light theme
+				colorStyles.push(`
+/* ${folderPath} - Light Theme */
+.nav-folder-title[data-path="${escapedPath}"] {
+    background: linear-gradient(135deg, 
+        ${this.adjustColorOpacity(lightColor, 0.1)} 0%, 
+        ${this.adjustColorOpacity(lightColor, 0.15)} 100%) !important;
+    border-left: 3px solid ${lightColor} !important;
+}
+
+.nav-folder-title[data-path="${escapedPath}"]:hover {
+    background: linear-gradient(135deg, 
+        ${this.adjustColorOpacity(lightColor, 0.2)} 0%, 
+        ${this.adjustColorOpacity(lightColor, 0.25)} 100%) !important;
+}
+
+.nav-folder-title[data-path="${escapedPath}"] .nav-folder-collapse-indicator {
+    color: ${lightColor} !important;
+}`);
+
+				// Generate CSS for dark theme
+				colorStyles.push(`
+/* ${folderPath} - Dark Theme */
+.theme-dark .nav-folder-title[data-path="${escapedPath}"] {
+    background: linear-gradient(135deg, 
+        ${this.adjustColorOpacity(darkColor, 0.15)} 0%, 
+        ${this.adjustColorOpacity(darkColor, 0.2)} 100%) !important;
+    border-left: 3px solid ${darkColor} !important;
+}
+
+.theme-dark .nav-folder-title[data-path="${escapedPath}"]:hover {
+    background: linear-gradient(135deg, 
+        ${this.adjustColorOpacity(darkColor, 0.25)} 0%, 
+        ${this.adjustColorOpacity(darkColor, 0.3)} 100%) !important;
+}
+
+.theme-dark .nav-folder-title[data-path="${escapedPath}"] .nav-folder-collapse-indicator {
+    color: ${darkColor} !important;
+}`);
+			}
+		}
+
+		return colorStyles.join('\n');
+	}
+
+	/**
+	 * Adjusts the opacity of an HSL color string.
+	 * 
+	 * Converts HSL colors to HSLA with specified opacity for background use.
+	 * This allows the base colors to be used with different transparency levels
+	 * for various UI states (normal, hover, etc.).
+	 * 
+	 * @param hslColor The HSL color string (e.g., "hsl(240, 70%, 50%)")
+	 * @param opacity The desired opacity (0-1)
+	 * @returns HSLA color string with specified opacity
+	 */
+	private adjustColorOpacity(hslColor: string, opacity: number): string {
+		// Convert hsl(h, s%, l%) to hsla(h, s%, l%, opacity)
+		return hslColor.replace('hsl(', 'hsla(').replace(')', `, ${opacity})`);
+	}
+
 	// =================================================================================
 	// CORE CREATION LOGIC
 	// =================================================================================
@@ -281,14 +432,17 @@ export default class MOCSystemPlugin extends Plugin {
 	 * 
 	 * This method:
 	 * 1. Generates a random emoji prefix for visual identification
-	 * 2. Creates a dedicated folder for the MOC
-	 * 3. Creates subfolders (Notes, Resources, Prompts) within that folder
-	 * 4. Creates the MOC file with appropriate frontmatter
-	 * 5. Opens the newly created file in the workspace
+	 * 2. Generates a unique color for the MOC folder
+	 * 3. Creates a dedicated folder for the MOC
+	 * 4. Creates subfolders (Notes, Resources, Prompts) within that folder
+	 * 5. Creates the MOC file with appropriate frontmatter including color information
+	 * 6. Updates the CSS to apply the unique color to this MOC's folder
+	 * 7. Opens the newly created file in the workspace
 	 * 
 	 * WHY: Each MOC gets its own folder to prevent file sprawl and maintain clear boundaries
 	 * between different knowledge domains. The MOC file has the same name as its folder for
 	 * consistency and to reinforce the 1:1 relationship between MOC and folder.
+	 * Unique colors help with visual identification alongside the emoji prefix.
 	 * 
 	 * @param name The name of the new MOC (without emoji prefix or 'MOC' suffix)
 	 * @returns The newly created MOC file
@@ -296,6 +450,9 @@ export default class MOCSystemPlugin extends Plugin {
 	async createMOC(name: string): Promise<TFile> {
 		// Generate a random emoji for visual identification
 		const randomEmoji = this.getRandomEmoji();
+		
+		// Generate a unique color for this MOC folder
+		const colorInfo = this.generateRandomColor();
 		
 		// Create folder and file paths
 		// WHY: The folder and file share the same name to reinforce that a MOC
@@ -306,20 +463,36 @@ export default class MOCSystemPlugin extends Plugin {
 		// Ensure the MOC folder and its subfolders exist
 		await this.ensureMOCFolderStructure(mocFolderName);
 		
-		// Create the MOC file with minimal frontmatter
-		// WHY: Minimal frontmatter keeps MOCs clean and focused on content. The 'tags' array
-		// format is used for Obsidian compatibility, while 'note-type' provides plugin-specific
-		// metadata. No content is added to encourage users to define their own structure.
+		// Create the MOC file with frontmatter including color information
+		// WHY: Color information is stored in frontmatter for persistence and easy access.
+		// Individual HSL values are stored for flexibility, while pre-calculated theme colors
+		// provide quick access for CSS generation. The root-moc-color flag indicates this
+		// is a root MOC for hierarchical color differentiation.
 		const content = `---
 tags:
   - moc
 note-type: moc
+root-moc-color: true
+moc-hue: ${colorInfo.hue}
+moc-saturation: ${colorInfo.saturation}
+moc-lightness: ${colorInfo.lightness}
+light-color: ${colorInfo.lightColor}
+dark-color: ${colorInfo.darkColor}
 ---
 `;
 		
 		const file = await this.app.vault.create(mocFilePath, content);
+		
 		await this.app.workspace.getLeaf().openFile(file);
 		new Notice(`Created MOC: ${name}`);
+		
+		// Update CSS to apply the unique color to this MOC's folder
+		// WHY: Delay the style update to ensure Obsidian has processed the folder creation
+		// and the file explorer has been updated with the new folder structure
+		setTimeout(async () => {
+			await this.updateMOCStyles();
+		}, 100);
+		
 		return file;
 	}
 
@@ -328,7 +501,9 @@ note-type: moc
 	 * 
 	 * Similar to createMOC but:
 	 * 1. Places the new MOC folder within the parent MOC's folder
-	 * 2. Automatically adds a link to the new sub-MOC in the parent's MOCs section
+	 * 2. Generates a unique color for the sub-MOC folder
+	 * 3. Automatically adds a link to the new sub-MOC in the parent's MOCs section
+	 * 4. Updates the CSS to apply the unique color to this sub-MOC's folder
 	 * 
 	 * @param parentMOC The file of the parent MOC where this sub-MOC will be nested
 	 * @param name The name of the new sub-MOC (without emoji prefix or 'MOC' suffix)
@@ -337,6 +512,10 @@ note-type: moc
 	async createSubMOC(parentMOC: TFile, name: string): Promise<TFile> {
 		// Generate a random emoji for visual identification
 		const randomEmoji = this.getRandomEmoji();
+		
+		// Generate a unique color for this sub-MOC folder
+		const colorInfo = this.generateRandomColor();
+		
 		const parentFolder = parentMOC.parent?.path || '';
 		
 		// Create folder and file paths within the parent MOC's folder
@@ -346,17 +525,32 @@ note-type: moc
 		// Ensure the sub-MOC folder and its subfolders exist
 		await this.ensureMOCFolderStructure(subMocFolderName);
 		
-		// Create the sub-MOC file with minimal frontmatter
+		// Create the sub-MOC file with frontmatter including color information
+		// WHY: Sub-MOCs get similar color treatment to root MOCs but without the root-moc-color flag
+		// This allows for different styling treatment while maintaining individual color identity
 		const content = `---
 tags:
   - moc
 note-type: moc
+moc-hue: ${colorInfo.hue}
+moc-saturation: ${colorInfo.saturation}
+moc-lightness: ${colorInfo.lightness}
+light-color: ${colorInfo.lightColor}
+dark-color: ${colorInfo.darkColor}
 ---
 `;
 		
 		const file = await this.app.vault.create(normalizePath(subMocFilePath), content);
+		
 		await this.addToMOCSection(parentMOC, 'MOCs', file);
 		new Notice(`Created sub-MOC: ${name}`);
+		
+		// Update CSS to apply the unique color to this sub-MOC's folder
+		// WHY: Delay the style update to ensure Obsidian has processed the folder creation
+		setTimeout(async () => {
+			await this.updateMOCStyles();
+		}, 100);
+		
 		return file;
 	}
 
@@ -470,6 +664,13 @@ note-type: prompt
 		
 		await this.addToMOCSection(parentMOC, 'Prompts', hubFile);
 		new Notice(`Created prompt: ${name}`);
+		
+		// Update styles to ensure any CSS changes are reflected
+		// WHY: Prompt creation might affect folder structure or trigger style updates
+		setTimeout(async () => {
+			await this.updateMOCStyles();
+		}, 100);
+		
 		return hubFile;
 	}
 
@@ -857,6 +1058,9 @@ note-type: prompt
 
 			await this.addToMOCSection(parentMOC, 'MOCs', movedMOC);
 
+			// Update styles to reflect the new folder path
+			await this.updateMOCStyles();
+
 			new Notice(`Moved ${moc.basename} to be under ${parentMOC.basename}`);
 			await this.app.workspace.getLeaf().openFile(parentMOC);
 		} catch (error) {
@@ -894,6 +1098,9 @@ note-type: prompt
 			const movedMOC = this.app.vault.getAbstractFileByPath(`${newFolderPath}/${moc.name}`) as TFile;
 			if (!movedMOC) throw new Error('Failed to find promoted MOC file.');
 
+			// Update styles to reflect the new folder path and root MOC status
+			await this.updateMOCStyles();
+
 			new Notice(`Promoted ${moc.basename} to a root MOC.`);
 			await this.app.workspace.getLeaf().openFile(movedMOC);
 		} catch (error) {
@@ -930,6 +1137,9 @@ note-type: prompt
 			if (!movedMOC) throw new Error('Failed to find moved MOC file.');
 
 			await this.addToMOCSection(newParent, 'MOCs', movedMOC);
+
+			// Update styles to reflect the new folder path
+			await this.updateMOCStyles();
 
 			new Notice(`Moved ${moc.basename} to ${newParent.basename}`);
 			await this.app.workspace.getLeaf().openFile(newParent);
@@ -1080,6 +1290,15 @@ note-type: prompt
 			if (!/^[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(file.basename)) {
 				updates.push('Add random emoji prefix to filename');
 			}
+
+			// Check for missing color information
+			// WHY: New color system requires all MOCs to have unique color assignments
+			// for visual identification in the file explorer
+			const cache = this.app.metadataCache.getFileCache(file);
+			const frontmatter = cache?.frontmatter;
+			if (!frontmatter?.['light-color'] || !frontmatter?.['dark-color']) {
+				updates.push('Add unique color information for folder styling');
+			}
 		}
 		// Check 4: Other file type requirements (e.g., emoji prefixes)
 		else if (noteType === 'note' && !file.basename.startsWith(NOTE_TYPES.Notes.emoji)) {
@@ -1115,6 +1334,12 @@ note-type: prompt
 		}
 		
 		const successCount = results.filter(r => r.success).length;
+		
+		// Update styles after all files have been processed to include any new colors
+		// WHY: Batch style update after all changes ensures all newly assigned colors
+		// are included in the generated CSS without multiple regenerations
+		await this.updateMOCStyles();
+		
 		new Notice(`Update complete! Successfully updated ${successCount}/${plan.filesToUpdate.length} files`);
 		return results;
 	}
@@ -1125,6 +1350,7 @@ note-type: prompt
 	 * Processes each update in sequence:
 	 * - Frontmatter updates are applied via processFrontMatter
 	 * - File moves/renames update the currentFile reference
+	 * - Color assignment generates and stores unique color information
 	 * - All updates are tracked for reporting
 	 * 
 	 * @param file The file to update
@@ -1133,6 +1359,8 @@ note-type: prompt
 	 */
 	async updateFile(file: TFile, updates: string[]): Promise<UpdateResult> {
 		let currentFile = file;
+		let needsStyleUpdate = false;
+		
 		try {
 			for (const update of updates) {
 				if (update.includes('note-type')) {
@@ -1144,8 +1372,34 @@ note-type: prompt
 					currentFile = await this.migrateToHierarchicalStructure(currentFile);
 				} else if (update.includes('emoji prefix') || update.includes('MOC suffix')) {
 					currentFile = await this.updateFileName(currentFile, update);
+				} else if (update.includes('color information')) {
+					// Generate and assign unique color information to the MOC
+					// WHY: This provides each existing MOC with the same color treatment as new ones
+					const colorInfo = this.generateRandomColor();
+					const isRootMOC = this.isRootMOC(currentFile);
+					
+					await this.app.fileManager.processFrontMatter(currentFile, (fm) => {
+						fm['moc-hue'] = colorInfo.hue;
+						fm['moc-saturation'] = colorInfo.saturation;
+						fm['moc-lightness'] = colorInfo.lightness;
+						fm['light-color'] = colorInfo.lightColor;
+						fm['dark-color'] = colorInfo.darkColor;
+						if (isRootMOC) {
+							fm['root-moc-color'] = true;
+						}
+					});
+					
+					needsStyleUpdate = true;
 				}
 			}
+			
+			// Update styles if any color changes were made
+			// WHY: Style update is deferred until after all changes to batch the update
+			// and ensure all new colors are included in the generated CSS
+			if (needsStyleUpdate) {
+				await this.updateMOCStyles();
+			}
+			
 			return { file: currentFile, changes: updates, success: true };
 		} catch (error) {
 			return { file, changes: updates, success: false, error: error.message };
@@ -1459,6 +1713,39 @@ note-type: prompt
 		const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
 		return String.fromCodePoint(codePoint);
 	}
+
+	/**
+	 * Generates a random color for MOC folders using HSL color space.
+	 * 
+	 * HSL (Hue, Saturation, Lightness) is used because it provides:
+	 * - Even distribution across the color spectrum (hue: 0-360°)
+	 * - Consistent saturation for vibrant colors (60-90%)
+	 * - Appropriate lightness for both light and dark themes (45-65%)
+	 * 
+	 * WHY: HSL ensures all generated colors are visually distinct and readable
+	 * while maintaining consistent vibrancy. Fixed saturation/lightness ranges
+	 * prevent colors that are too pale or too dark to be effective visual markers.
+	 * 
+	 * @returns An object containing HSL values and CSS color strings for light/dark themes
+	 */
+	private generateRandomColor(): { hue: number, saturation: number, lightness: number, lightColor: string, darkColor: string } {
+		// Generate random hue (0-360 degrees) for full color spectrum coverage
+		const hue = Math.floor(Math.random() * 360);
+		
+		// Fixed saturation range (60-90%) for vibrant but not oversaturated colors
+		const saturation = 60 + Math.floor(Math.random() * 30);
+		
+		// Fixed lightness range (45-65%) for good contrast without being too dark/light
+		const lightness = 45 + Math.floor(Math.random() * 20);
+		
+		// Generate theme-appropriate color variants
+		// WHY: Light theme uses the base color with reduced opacity for backgrounds
+		// Dark theme uses slightly higher lightness for better visibility
+		const lightColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+		const darkColor = `hsl(${hue}, ${saturation}%, ${Math.min(lightness + 10, 75)}%)`;
+		
+		return { hue, saturation, lightness, lightColor, darkColor };
+	}
 }
 
 
@@ -1605,6 +1892,13 @@ class CreateMOCModal extends Modal {
 			if (createPromptCheckbox.checked) {
 				const promptName = promptNameEl.value.trim() || mocName.replace(/\s+MOC$/i, '').trim() || mocName;
 				await this.plugin.createPrompt(mocFile, promptName);
+				
+				// Update styles after prompt creation to ensure MOC folder styling is applied
+				// WHY: Creating a prompt can sometimes trigger style updates that need to include
+				// the MOC's unique color, so we ensure styles are current after prompt creation
+				setTimeout(async () => {
+					await this.plugin.updateMOCStyles();
+				}, 150);
 			}
 
 			this.onSubmit(mocName);
