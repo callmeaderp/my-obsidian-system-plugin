@@ -4,56 +4,24 @@ import { App, Modal, Notice, Plugin, TFile, TFolder, normalizePath } from 'obsid
 // PLUGIN CONSTANTS AND TYPES
 // =================================================================================
 
-/**
- * Plugin settings interface (currently empty but maintained for future extensibility)
- */
+/** Plugin settings interface */
 type PluginSettings = Record<string, never>;
 
-/**
- * Default plugin settings
- */
+/** Default plugin settings */
 const DEFAULT_SETTINGS: PluginSettings = {};
 
-/**
- * Defines the subfolder names within a MOC's primary folder.
- * Each MOC folder contains these three subfolders for organizing different content types.
- * 
- * WHY: This structure was chosen to provide clear separation of concerns within each MOC.
- * Having dedicated folders prevents naming conflicts and makes the file explorer more scannable.
- * The folder names are intentionally plural to indicate they contain collections.
- */
+/** Subfolder names within each MOC's primary folder */
 const FOLDERS = {
 	Notes: 'Notes',
 	Resources: 'Resources',
 	Prompts: 'Prompts'
 } as const;
 
-/**
- * Defines the standard order of sections within a MOC file.
- * This order is enforced when adding new content to ensure consistency.
- * 
- * WHY: This specific order follows a hierarchy from most abstract (other MOCs) to most
- * concrete (prompts). MOCs come first as they represent the highest level of organization,
- * followed by content (Notes), reference materials (Resources), and finally AI interactions (Prompts).
- * This ordering helps users mentally navigate from structure to content to tools.
- */
+/** Standard order of sections within a MOC file */
 const SECTION_ORDER = ['MOCs', 'Notes', 'Resources', 'Prompts'] as const;
 type SectionType = typeof SECTION_ORDER[number];
 
-/**
- * Defines the standard emoji prefixes for different note types.
- * These emojis are prepended to filenames for visual identification.
- * 
- * WHY: Fixed emojis for non-MOC types provide instant visual recognition in the file explorer.
- * The specific choices:
- * - 📝 (Notes): Universal symbol for writing/documentation
- * - 📁 (Resources): Represents stored reference materials
- * - 🤖 (Prompts): Clearly indicates AI/LLM interaction files
- * - 🔵 (MOCs fallback): Only used as a default; actual MOCs get random emojis for distinction
- * 
- * Random emojis for MOCs were chosen to make each MOC visually unique and memorable,
- * helping with quick identification when scanning many MOCs.
- */
+/** Standard emoji prefixes for different note types */
 const NOTE_TYPES = {
 	MOCs: { emoji: '🔵' }, // Default for sub-MOCs, though new ones get random emojis
 	Notes: { emoji: '📝' },
@@ -66,10 +34,7 @@ const NOTE_TYPES = {
 // INTERFACES
 // =================================================================================
 
-/**
- * Represents the result of updating a single file during vault modernization.
- * Tracks whether the update succeeded and what changes were applied.
- */
+/** Result of updating a single file during vault modernization */
 interface UpdateResult {
 	file: TFile;
 	changes: string[];
@@ -77,10 +42,7 @@ interface UpdateResult {
 	error?: string;
 }
 
-/**
- * Represents a plan for updating multiple files in the vault.
- * Used to preview changes before executing them.
- */
+/** Plan for updating multiple files in the vault */
 interface VaultUpdatePlan {
 	filesToUpdate: TFile[];
 	updateSummary: Map<TFile, string[]>;
@@ -93,61 +55,37 @@ interface VaultUpdatePlan {
 // =================================================================================
 
 /**
- * Main plugin class for the MOC System Plugin.
- * 
- * This plugin implements a hierarchical note-taking system based on Maps of Content (MOCs).
- * Each MOC serves as a hub that organizes related sub-MOCs, notes, resources, and prompts.
- * 
- * Key features:
- * - Context-aware note creation based on current location
- * - Hierarchical folder structure with each MOC having its own folder
- * - Automatic organization of content into predefined sections
- * - Prompt iteration management with version control
- * - MOC reorganization capabilities (promote/demote/move)
- * - Vault-wide modernization tools
- * - Cleanup utilities for safe file removal
+ * Main plugin class implementing a hierarchical MOC-based note-taking system.
+ * Provides context-aware creation, organization, and maintenance tools.
  */
 export default class MOCSystemPlugin extends Plugin {
 	settings: PluginSettings;
 	private styleElement: HTMLStyleElement | null = null;
 
-	/**
-	 * Plugin initialization and setup.
-	 * Loads settings, registers commands, and sets up event listeners.
-	 * 
-	 * WHY: The initialization order matters - settings must load first as they may affect
-	 * other operations, then commands become available, then styles are loaded with a delay
-	 * to ensure Obsidian's file explorer and metadata cache are fully ready.
-	 */
+	/** Plugin initialization - loads settings, registers commands, and sets up event listeners */
 	async onload() {
 		await this.loadSettings();
 		
 		// Load initial styles with a delay to ensure Obsidian is fully ready
-		// WHY: The file explorer and metadata cache need time to initialize before
-		// we can properly scan for MOC files and apply their unique colors
 		setTimeout(async () => {
 			await this.updateMOCStyles();
 		}, 1000);
 
 		// Also listen for layout ready event for more reliable style loading
-		// WHY: This ensures styles are applied even if the timeout isn't sufficient
 		this.app.workspace.onLayoutReady(() => {
 			setTimeout(async () => {
 				await this.updateMOCStyles();
 			}, 500);
 		});
 
-		// --- Command Registration ---
-		// WHY: This is the primary command and comes first. Context-aware creation reduces
-		// cognitive load by determining the appropriate action based on current location.
+		// Command Registration
 		this.addCommand({
 			id: 'moc-context-create',
 			name: 'Create MOC or add content',
 			callback: () => this.handleContextCreate()
 		});
 
-		// WHY: checkCallback is used here instead of callback because this command should only
-		// be available when the active file is a MOC. This prevents user confusion and errors.
+		// Available only when active file is a MOC
 		this.addCommand({
 			id: 'reorganize-moc',
 			name: 'Reorganize MOC',
@@ -199,9 +137,7 @@ export default class MOCSystemPlugin extends Plugin {
 			callback: () => this.cleanupMOCSystem()
 		});
 
-		// --- Event Listeners ---
-		// WHY: Automatic broken link cleanup maintains vault integrity without user intervention.
-		// This prevents the accumulation of dead links which could confuse users and break navigation.
+		// Event Listeners - automatic broken link cleanup
 		this.registerEvent(
 			this.app.vault.on('delete', (file) => {
 				if (file instanceof TFile) {
@@ -211,35 +147,22 @@ export default class MOCSystemPlugin extends Plugin {
 		);
 	}
 
-	/**
-	 * Plugin cleanup and teardown.
-	 * Removes injected styles when the plugin is disabled.
-	 */
+	/** Plugin cleanup - removes injected styles */
 	onunload() {
 		this.removeStyles();
 	}
 
-	/**
-	 * Loads plugin settings from disk.
-	 * Merges saved settings with defaults to ensure all properties exist.
-	 */
+	/** Loads plugin settings from disk */
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 	}
 
-	/**
-	 * Saves current plugin settings to disk.
-	 */
+	/** Saves current plugin settings to disk */
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
 
-	/**
-	 * Loads and injects CSS styles for MOC folder highlighting.
-	 * 
-	 * Reads the styles.css file and injects it into the document head
-	 * to provide visual distinction for MOC folders in the file explorer.
-	 */
+	/** Loads and injects CSS styles for MOC folder highlighting */
 	async loadStyles() {
 		try {
 			const cssPath = normalizePath(`${this.app.vault.configDir}/plugins/${this.manifest.id}/styles.css`);
@@ -254,11 +177,7 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 	}
 
-	/**
-	 * Removes injected CSS styles.
-	 * 
-	 * Called during plugin unload to clean up any styling changes.
-	 */
+	/** Removes injected CSS styles */
 	removeStyles() {
 		if (this.styleElement) {
 			this.styleElement.remove();
@@ -266,24 +185,10 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 	}
 
-	/**
-	 * Updates the CSS styles to apply unique colors to MOC folders.
-	 * 
-	 * This method:
-	 * 1. Scans all MOC files in the vault for color information
-	 * 2. Generates dynamic CSS rules for each MOC's unique color
-	 * 3. Combines base styles with individual MOC color styles
-	 * 4. Injects the updated styles into the document
-	 * 
-	 * WHY: Dynamic CSS generation allows each MOC folder to have its own unique color
-	 * while maintaining the base styling structure. Using data-path attributes allows
-	 * precise targeting of individual folders without affecting global styles.
-	 */
+	/** Updates CSS styles to apply unique colors to MOC folders */
 	async updateMOCStyles() {
 		try {
 			// First load the base CSS from styles.css
-			// WHY: We use the actual folder name instead of manifest.id to handle cases where
-			// the folder name differs from the plugin ID in manifest.json
 			const cssPath = normalizePath(`${this.app.vault.configDir}/plugins/my-obsidian-system-plugin/styles.css`);
 			let baseCssContent = '';
 			try {
@@ -336,9 +241,7 @@ export default class MOCSystemPlugin extends Plugin {
 				const darkColor = frontmatter['dark-color'];
 				const isRootMOC = frontmatter['root-moc-color'] === true;
 
-				// WHY: We escape the folder path for CSS selector safety and use exact attribute matching
-				// to ensure we only target the specific folder. The opacity values provide subtle
-				// background colors that don't interfere with text readability.
+				// Escape folder path for CSS selector safety
 				const escapedPath = folderPath.replace(/['"\\]/g, '\\$&');
 				
 				// Generate CSS for light theme
@@ -406,13 +309,7 @@ export default class MOCSystemPlugin extends Plugin {
 	// CORE CREATION LOGIC
 	// =================================================================================
 
-	/**
-	 * Handles the main command, creating a new root MOC or adding content to an existing one.
-	 * 
-	 * This is the primary entry point for user interaction with the plugin.
-	 * If the user is not currently in a MOC, it opens a modal to create a new root MOC.
-	 * If the user is in a MOC, it opens a modal to add new content to that MOC.
-	 */
+	/** Handles the main command - creates new root MOC or adds content to existing MOC */
 	async handleContextCreate() {
 		const activeFile = this.app.workspace.getActiveFile();
 		
@@ -428,22 +325,7 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	/**
-	 * Creates a new root MOC, including its dedicated folder structure.
-	 * 
-	 * This method:
-	 * 1. Generates a random emoji prefix for visual identification
-	 * 2. Generates a unique color for the MOC folder
-	 * 3. Creates a dedicated folder for the MOC
-	 * 4. Creates subfolders (Notes, Resources, Prompts) within that folder
-	 * 5. Creates the MOC file with appropriate frontmatter including color information
-	 * 6. Updates the CSS to apply the unique color to this MOC's folder
-	 * 7. Opens the newly created file in the workspace
-	 * 
-	 * WHY: Each MOC gets its own folder to prevent file sprawl and maintain clear boundaries
-	 * between different knowledge domains. The MOC file has the same name as its folder for
-	 * consistency and to reinforce the 1:1 relationship between MOC and folder.
-	 * Unique colors help with visual identification alongside the emoji prefix.
-	 * 
+	 * Creates a new root MOC with dedicated folder structure.
 	 * @param name The name of the new MOC (without emoji prefix or 'MOC' suffix)
 	 * @returns The newly created MOC file
 	 */
@@ -455,8 +337,6 @@ export default class MOCSystemPlugin extends Plugin {
 		const colorInfo = this.generateRandomColor();
 		
 		// Create folder and file paths
-		// WHY: The folder and file share the same name to reinforce that a MOC
-		// represents both a concept (the file) and a container (the folder).
 		const mocFolderName = `${randomEmoji} ${name} MOC`;
 		const mocFilePath = `${mocFolderName}/${mocFolderName}.md`;
 		
@@ -464,10 +344,6 @@ export default class MOCSystemPlugin extends Plugin {
 		await this.ensureMOCFolderStructure(mocFolderName);
 		
 		// Create the MOC file with frontmatter including color information
-		// WHY: Color information is stored in frontmatter for persistence and easy access.
-		// Individual HSL values are stored for flexibility, while pre-calculated theme colors
-		// provide quick access for CSS generation. The root-moc-color flag indicates this
-		// is a root MOC for hierarchical color differentiation.
 		const content = `---
 tags:
   - moc
@@ -487,8 +363,6 @@ dark-color: ${colorInfo.darkColor}
 		new Notice(`Created MOC: ${name}`);
 		
 		// Update CSS to apply the unique color to this MOC's folder
-		// WHY: Delay the style update to ensure Obsidian has processed the folder creation
-		// and the file explorer has been updated with the new folder structure
 		setTimeout(async () => {
 			await this.updateMOCStyles();
 		}, 100);
@@ -526,8 +400,6 @@ dark-color: ${colorInfo.darkColor}
 		await this.ensureMOCFolderStructure(subMocFolderName);
 		
 		// Create the sub-MOC file with frontmatter including color information
-		// WHY: Sub-MOCs get similar color treatment to root MOCs but without the root-moc-color flag
-		// This allows for different styling treatment while maintaining individual color identity
 		const content = `---
 tags:
   - moc
@@ -546,7 +418,6 @@ dark-color: ${colorInfo.darkColor}
 		new Notice(`Created sub-MOC: ${name}`);
 		
 		// Update CSS to apply the unique color to this sub-MOC's folder
-		// WHY: Delay the style update to ensure Obsidian has processed the folder creation
 		setTimeout(async () => {
 			await this.updateMOCStyles();
 		}, 100);
@@ -556,14 +427,6 @@ dark-color: ${colorInfo.darkColor}
 
 	/**
 	 * Creates a new note inside a parent MOC's "Notes" subfolder.
-	 * 
-	 * Notes are the primary content files within a MOC.
-	 * They are automatically:
-	 * 1. Prefixed with 📝 emoji
-	 * 2. Placed in the MOC's Notes subfolder
-	 * 3. Tagged with note-type: note in frontmatter
-	 * 4. Linked in the parent MOC's Notes section
-	 * 
 	 * @param parentMOC The file of the parent MOC where this note belongs
 	 * @param name The name of the new note (without emoji prefix)
 	 * @returns The newly created note file
@@ -581,14 +444,6 @@ dark-color: ${colorInfo.darkColor}
 
 	/**
 	 * Creates a new resource inside a parent MOC's "Resources" subfolder.
-	 * 
-	 * Resources are reference materials or external content related to a MOC.
-	 * They are automatically:
-	 * 1. Prefixed with 📁 emoji
-	 * 2. Placed in the MOC's Resources subfolder
-	 * 3. Tagged with note-type: resource in frontmatter
-	 * 4. Linked in the parent MOC's Resources section
-	 * 
 	 * @param parentMOC The file of the parent MOC where this resource belongs
 	 * @param name The name of the new resource (without emoji prefix)
 	 * @returns The newly created resource file
@@ -605,22 +460,7 @@ dark-color: ${colorInfo.darkColor}
 	}
 
 	/**
-	 * Creates a new prompt hub and its first iteration inside a dedicated subfolder.
-	 * 
-	 * Prompts are special files designed for LLM interactions.
-	 * This method creates:
-	 * 1. A dedicated subfolder for the prompt within the Prompts folder
-	 * 2. A prompt hub file that tracks all iterations
-	 * 3. The first iteration (v1) of the prompt
-	 * 
-	 * Structure created:
-	 * - MOC/Prompts/PromptName/🤖 PromptName.md (hub)
-	 * - MOC/Prompts/PromptName/🤖 PromptName v1.md (iteration)
-	 * 
-	 * The hub includes:
-	 * - An Iterations section with links to all versions
-	 * - An LLM Links section with a code block for storing URLs
-	 * 
+	 * Creates a new prompt hub and its first iteration in a dedicated subfolder.
 	 * @param parentMOC The file of the parent MOC where this prompt belongs
 	 * @param name The name of the new prompt (without emoji prefix or version)
 	 * @returns The newly created prompt hub file
@@ -666,7 +506,6 @@ note-type: prompt
 		new Notice(`Created prompt: ${name}`);
 		
 		// Update styles to ensure any CSS changes are reflected
-		// WHY: Prompt creation might affect folder structure or trigger style updates
 		setTimeout(async () => {
 			await this.updateMOCStyles();
 		}, 100);
@@ -676,14 +515,6 @@ note-type: prompt
 
 	/**
 	 * Ensures the full folder structure for a given MOC exists.
-	 * 
-	 * Creates the MOC's main folder and all required subfolders:
-	 * - Notes/
-	 * - Resources/
-	 * - Prompts/
-	 * 
-	 * Handles race conditions gracefully by ignoring "folder already exists" errors.
-	 * 
 	 * @param mocFolderPath The path to the MOC's main folder
 	 */
 	async ensureMOCFolderStructure(mocFolderPath: string) {
@@ -709,23 +540,9 @@ note-type: prompt
 
 	/**
 	 * Adds a link to a new file into the correct section of a MOC, reorganizing if necessary.
-	 * 
-	 * This method:
-	 * 1. Reads the MOC content and identifies section locations
-	 * 2. Reorganizes sections to maintain the standard order (MOCs, Notes, Resources, Prompts)
-	 * 3. Creates the section if it doesn't exist
-	 * 4. Adds the new file link in the appropriate section
-	 * 
-	 * The reorganization ensures that plugin-managed sections always appear
-	 * at the top of the file in the correct order, with any user content below.
-	 * 
-	 * WHY: This approach preserves user customizations while enforcing structure. By moving
-	 * plugin sections to the top, we ensure consistency across all MOCs while allowing users
-	 * to add custom content below without interference.
-	 * 
-	 * @param moc The MOC file to modify
-	 * @param section The section to add the link to (must be one of SECTION_ORDER)
-	 * @param newFile The file to link to (will use its basename for the link)
+	 * @param moc The MOC file to update
+	 * @param section The section to add the link to
+	 * @param newFile The file to link to
 	 */
 	async addToMOCSection(moc: TFile, section: SectionType, newFile: TFile) {
 		let content = await this.app.vault.read(moc);
@@ -735,7 +552,7 @@ note-type: prompt
 		let frontmatterEnd = 0;
 		if (lines[0] === '---') {
 			// Find the closing '---' after the opening one
-			// WHY: slice(1) skips the first '---' to find the closing one
+			// Skip first '---' to find the closing one
 			frontmatterEnd = lines.slice(1).indexOf('---') + 2;
 		}
 		
@@ -749,8 +566,7 @@ note-type: prompt
 			const currentSectionOrderIndex = SECTION_ORDER.indexOf(section);
 
 			// Find the next existing section to insert before.
-			// WHY: We insert new sections before later sections to maintain the standard order.
-			// This ensures MOCs always comes before Notes, which comes before Resources, etc.
+			// Insert new sections before later sections to maintain standard order
 			for (let i = currentSectionOrderIndex + 1; i < SECTION_ORDER.length; i++) {
 				const nextSection = SECTION_ORDER[i];
 				if (sectionIndices.has(nextSection)) {
@@ -760,13 +576,13 @@ note-type: prompt
 			}
 
 			// If no later sections exist, append after the last known plugin section.
-			// WHY: This keeps all plugin sections grouped together before user content.
+			// Keep plugin sections grouped together before user content
 			if (insertIndex === frontmatterEnd && sectionIndices.size > 0) {
 				const lastSectionIndex = Math.max(...Array.from(sectionIndices.values()));
 				insertIndex = this.findSectionEnd(reorganizedLines, lastSectionIndex);
 			}
 
-			// WHY: Empty lines before and after provide visual separation between sections
+			// Empty lines provide visual separation between sections
 			const newSectionContent = [`## ${section}`, ``, `- [[${newFile.basename}]]`, ``];
 			reorganizedLines.splice(insertIndex, 0, ...newSectionContent);
 
@@ -786,19 +602,6 @@ note-type: prompt
 
 	/**
 	 * Reorganizes MOC content to ensure plugin-managed sections are ordered correctly at the top.
-	 * 
-	 * This method maintains the integrity of the MOC structure by:
-	 * 1. Identifying all plugin-managed sections (MOCs, Notes, Resources, Prompts)
-	 * 2. Extracting them with their content
-	 * 3. Placing them at the top of the file in the standard order
-	 * 4. Moving any other user content to the end of the file
-	 * 
-	 * This ensures consistent MOC structure while preserving user customizations.
-	 * 
-	 * WHY: This complex reorganization is necessary because users might manually edit MOCs
-	 * and disorder sections. By enforcing order only for plugin sections, we maintain
-	 * structure without destroying user customizations.
-	 * 
 	 * @param lines The lines of the MOC file split by newlines
 	 * @param frontmatterEnd The index of the line after the closing '---' of frontmatter
 	 * @returns An object containing the reorganized lines and a map of section start indices
@@ -812,7 +615,7 @@ note-type: prompt
 		const consumedLineIndices = new Set<number>();
 
 		// 1. Extract all known plugin sections
-		// WHY: We iterate in SECTION_ORDER to maintain the desired sequence even during extraction
+		// Iterate in SECTION_ORDER to maintain desired sequence
 		for (const sectionName of SECTION_ORDER) {
 			const header = `## ${sectionName}`;
 			// Start searching after frontmatter to avoid matching content within it
@@ -824,8 +627,7 @@ note-type: prompt
 				pluginSections.push({ name: sectionName, content: sectionContent });
 
 				// Mark these lines as "consumed"
-				// WHY: This prevents the same lines from being included in otherContentLines,
-				// avoiding duplication when we rebuild the file
+				// Prevent duplication when rebuilding the file
 				for (let i = startIndex; i < endIndex; i++) {
 					consumedLineIndices.add(i);
 				}
@@ -885,22 +687,10 @@ note-type: prompt
 
 	/**
 	 * Duplicates a prompt iteration, incrementing the version number.
-	 * 
-	 * This method:
-	 * 1. Parses the current version from the filename (e.g., "v2" from "Prompt v2.md")
-	 * 2. Finds the highest version number among all iterations
-	 * 3. Creates a new iteration with the next version number
-	 * 4. Optionally adds a description to the filename
-	 * 5. Updates the prompt hub to include the new iteration
-	 * 
-	 * WHY: Version numbers provide clear evolution tracking for prompts. Finding the max version
-	 * ensures we don't accidentally overwrite existing iterations if versions were created out of order.
-	 * 
 	 * @param file The prompt iteration file to duplicate (must match pattern "*v\d+*")
 	 */
 	async duplicatePromptIteration(file: TFile) {
 		// Extract base name and version from filename
-		// WHY: The regex handles optional emoji prefix and captures name + version separately
 		const match = file.basename.match(/^(?:🤖\s+)?(.+?)\s*v(\d+)/);
 		if (!match) return;
 		
@@ -912,8 +702,6 @@ note-type: prompt
 		const siblings = promptsFolder.children.filter(f => f instanceof TFile && f.name.includes(baseName) && f.name.match(/v(\d+)/)) as TFile[];
 		
 		// Find highest existing version to determine next version
-		// WHY: We scan all siblings rather than just incrementing from current file's version
-		// to handle cases where versions might have been created out of order
 		let maxVersion = 0;
 		for (const pFile of siblings) {
 			const vMatch = pFile.basename.match(/v(\d+)/);
@@ -940,12 +728,6 @@ note-type: prompt
 	
 	/**
 	 * Adds a link to a new prompt iteration to its corresponding hub file.
-	 * 
-	 * The hub file maintains a list of all iterations in its "## Iterations" section.
-	 * This method finds that section and appends the new iteration link.
-	 * Hub files are located directly in the MOC's Prompts folder, while iterations
-	 * are organized in dedicated subfolders named after the prompt.
-	 * 
 	 * @param baseName The base name of the prompt (without emoji or version)
 	 * @param newIteration The newly created iteration file to link
 	 * @param promptSubfolderPath The path to the prompt's dedicated subfolder containing iterations
@@ -1010,11 +792,6 @@ note-type: prompt
 
 	/**
 	 * Initiates the MOC reorganization process by opening a context-aware modal.
-	 * 
-	 * The modal options depend on whether the MOC is:
-	 * - A root MOC: Can be moved under a parent
-	 * - A sub-MOC: Can be promoted to root or moved to a different parent
-	 * 
 	 * @param moc The MOC file to reorganize
 	 */
 	async reorganizeMOC(moc: TFile) {
@@ -1023,13 +800,6 @@ note-type: prompt
 
 	/**
 	 * Converts a root MOC into a sub-MOC by moving its folder under a parent MOC.
-	 * 
-	 * This operation:
-	 * 1. Creates a new parent MOC if needed (when parentMOCName is provided)
-	 * 2. Moves the entire MOC folder to be a subfolder of the parent
-	 * 3. Updates the parent MOC to include a link to the moved MOC
-	 * 4. Obsidian automatically updates all internal links
-	 * 
 	 * @param moc The root MOC to move
 	 * @param parentMOCName The name for a new parent MOC to be created (if existingParent is null)
 	 * @param existingParent An existing MOC to use as the parent (if provided, parentMOCName is ignored)
@@ -1074,15 +844,6 @@ note-type: prompt
 
 	/**
 	 * Promotes a sub-MOC to a root MOC by moving its folder to the vault's root.
-	 * 
-	 * This operation:
-	 * 1. Removes all links to this MOC from any parent MOCs
-	 * 2. Moves the MOC folder to the vault root
-	 * 3. Opens the promoted MOC in the workspace
-	 * 
-	 * WHY: Promotion allows users to elevate a sub-topic to a main topic as their knowledge
-	 * structure evolves. Removing parent links first prevents broken references.
-	 * 
 	 * @param moc The sub-MOC to promote to root level
 	 */
 	async promoteSubMOCToRoot(moc: TFile) {
@@ -1091,10 +852,10 @@ note-type: prompt
 			if (!mocFolder) throw new Error('MOC folder not found.');
 
 			// The new path is just the folder's name at the vault root.
-			// WHY: No path prefix means vault root in Obsidian's file system
+			// No path prefix means vault root
 			const newFolderPath = mocFolder.name;
 			
-			// WHY: Remove links first to prevent broken references after the move
+			// Remove links first to prevent broken references
 			await this.removeFromParentMOCs(moc);
 			await this.app.vault.rename(mocFolder, newFolderPath);
 			
@@ -1216,11 +977,6 @@ note-type: prompt
 
 	/**
 	 * Scans the vault to find all files that need updating.
-	 * 
-	 * Examines each markdown file to determine if it:
-	 * - Is a plugin-managed file (has note-type or looks like one)
-	 * - Needs any updates to conform to current standards
-	 * 
 	 * @returns A comprehensive plan detailing all files and their required updates
 	 */
 	async analyzeVaultForUpdates(): Promise<VaultUpdatePlan> {
@@ -1245,17 +1001,6 @@ note-type: prompt
 	
 	/**
 	 * Detects what updates an individual file needs to conform to the system.
-	 * 
-	 * Checks for:
-	 * 1. Missing note-type metadata
-	 * 2. Files that need migration to hierarchical folder structure
-	 * 3. MOCs missing required suffix or emoji prefix
-	 * 4. Other file types missing their emoji prefixes
-	 * 
-	 * WHY: This comprehensive checking allows us to modernize vaults created with older
-	 * versions of the plugin or manually created files that follow the naming convention
-	 * but lack proper metadata.
-	 * 
 	 * @param file The file to analyze
 	 * @returns Array of human-readable update descriptions
 	 */
@@ -1266,8 +1011,6 @@ note-type: prompt
 		
 		const isPluginFile = noteType && ['moc', 'note', 'resource', 'prompt'].includes(noteType);
 		// A file is a potential plugin file if it looks like one, even without metadata
-		// WHY: We check both metadata and path/naming patterns to catch files created manually
-		// or with older plugin versions that might not have complete metadata
 		const isLegacyFile = file.basename.includes('MOC') || file.path.includes(FOLDERS.Notes) || file.path.includes(FOLDERS.Resources) || file.path.includes(FOLDERS.Prompts);
 
 		if (!isPluginFile && !isLegacyFile) return [];
@@ -1288,15 +1031,11 @@ note-type: prompt
 			if (!file.basename.endsWith(' MOC')) updates.push('Add "MOC" suffix to filename');
 			
 			// Check for emoji prefix using Unicode ranges
-			// WHY: We check multiple Unicode ranges to catch any emoji, not just specific ones.
-			// The 'u' flag enables proper Unicode matching for emoji characters.
 			if (!/^[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(file.basename)) {
 				updates.push('Add random emoji prefix to filename');
 			}
 
 			// Check for missing color information
-			// WHY: New color system requires all MOCs to have unique color assignments
-			// for visual identification in the file explorer
 			const cache = this.app.metadataCache.getFileCache(file);
 			const frontmatter = cache?.frontmatter;
 			if (!frontmatter?.['light-color'] || !frontmatter?.['dark-color']) {
@@ -1315,7 +1054,7 @@ note-type: prompt
 		}
 		
 		// Check 5: Prompt hub migration to new structure
-		// WHY: New prompt structure requires hubs to be in MOC/Prompts/ folder instead of subfolders
+		// New prompt structure requires hubs in main Prompts folder
 		if (noteType === 'prompt' && this.needsPromptHubMigration(file)) {
 			updates.push('Migrate prompt hub to new location in Prompts folder');
 		}
@@ -1345,8 +1084,7 @@ note-type: prompt
 		const successCount = results.filter(r => r.success).length;
 		
 		// Update styles after all files have been processed to include any new colors
-		// WHY: Batch style update after all changes ensures all newly assigned colors
-		// are included in the generated CSS without multiple regenerations
+		// Batch style update after all changes
 		await this.updateMOCStyles();
 		
 		new Notice(`Update complete! Successfully updated ${successCount}/${plan.filesToUpdate.length} files`);
@@ -1385,7 +1123,7 @@ note-type: prompt
 					currentFile = await this.migratePromptHub(currentFile);
 				} else if (update.includes('color information')) {
 					// Generate and assign unique color information to the MOC
-					// WHY: This provides each existing MOC with the same color treatment as new ones
+					// Provide existing MOCs with same color treatment as new ones
 					const colorInfo = this.generateRandomColor();
 					const isRootMOC = this.isRootMOC(currentFile);
 					
@@ -1405,8 +1143,7 @@ note-type: prompt
 			}
 			
 			// Update styles if any color changes were made
-			// WHY: Style update is deferred until after all changes to batch the update
-			// and ensure all new colors are included in the generated CSS
+			// Defer style update until after all changes to batch updates
 			if (needsStyleUpdate) {
 				await this.updateMOCStyles();
 			}
@@ -1445,14 +1182,6 @@ note-type: prompt
 
 	/**
 	 * Migrates a prompt hub from a subfolder to the Prompts folder.
-	 * 
-	 * The new prompt structure places hub files directly in MOC/Prompts/ for easy access,
-	 * while keeping iterations organized in subfolders. This method moves existing hubs
-	 * from their current subfolder location to the parent Prompts folder.
-	 * 
-	 * WHY: Hub files in the main Prompts folder are more accessible while iterations
-	 * remain organized in dedicated subfolders for tidiness.
-	 * 
 	 * @param file The prompt hub file to migrate
 	 * @returns The file at its new location
 	 */
@@ -1544,8 +1273,7 @@ note-type: prompt
 					await this.app.vault.delete(file);
 					deletedCount++;
 				} catch (error) {
-					// WHY: Individual file deletion failures shouldn't stop the cleanup process.
-					// We log the error for debugging but continue with remaining files.
+					// Continue cleanup even if individual files fail to delete
 					console.error(`Failed to delete ${file.path}:`, error);
 				}
 			}
@@ -1555,11 +1283,6 @@ note-type: prompt
 	
 	/**
 	 * Removes broken links from all files when a file is deleted.
-	 * 
-	 * Automatically triggered when any file is deleted.
-	 * Searches all markdown files for links to the deleted file
-	 * and removes those link lines to prevent broken references.
-	 * 
 	 * @param deletedFile The file that was just deleted
 	 */
 	async cleanupBrokenLinks(deletedFile: TFile) {
@@ -1583,10 +1306,6 @@ note-type: prompt
 
 	/**
 	 * Checks if a file is a MOC based on its frontmatter tag.
-	 * 
-	 * A file is considered a MOC if it has 'moc' in its tags array.
-	 * This is the primary way to identify MOCs regardless of filename.
-	 * 
 	 * @param file The file to check
 	 * @returns true if the file is tagged as a MOC
 	 */
@@ -1597,10 +1316,6 @@ note-type: prompt
 	
 	/**
 	 * Checks if a MOC is a root MOC (i.e., its folder is at the top level of the vault).
-	 * 
-	 * Root MOCs have their folders directly in the vault root.
-	 * Sub-MOCs have their folders nested within other MOC folders.
-	 * 
 	 * @param file The file to check
 	 * @returns true if the MOC's folder is at the vault root level
 	 */
@@ -1613,11 +1328,6 @@ note-type: prompt
 
 	/**
 	 * Checks if a file is a prompt iteration (e.g., contains 'v1', 'v2').
-	 * 
-	 * Prompt iterations are versioned files with patterns like:
-	 * - "Prompt v1.md"
-	 * - "Prompt v2 - description.md"
-	 * 
 	 * @param file The file to check
 	 * @returns true if the file is a prompt iteration with version number
 	 */
@@ -1628,10 +1338,6 @@ note-type: prompt
 
 	/**
 	 * Checks if a file is a prompt hub (a prompt that isn't an iteration).
-	 * 
-	 * Prompt hubs are the main prompt files that track all iterations.
-	 * They don't have version numbers in their names.
-	 * 
 	 * @param file The file to check
 	 * @returns true if the file is a prompt hub (not an iteration)
 	 */
@@ -1659,14 +1365,6 @@ note-type: prompt
 
 	/**
 	 * Checks if a prompt hub file needs migration to the new structure.
-	 * 
-	 * In the new structure, prompt hubs should be directly in MOC/Prompts/ folder,
-	 * not in subfolders like MOC/Prompts/PromptName/. This method identifies
-	 * prompt hubs that are currently in subfolders and need to be moved.
-	 * 
-	 * WHY: The new structure puts hubs at the top level for easier access while
-	 * keeping iterations organized in subfolders.
-	 * 
 	 * @param file The file to check
 	 * @returns true if the file is a prompt hub in a subfolder that needs migration
 	 */
@@ -1693,11 +1391,6 @@ note-type: prompt
 
 	/**
 	 * Detects a file's type based on its path or name.
-	 * 
-	 * Uses various heuristics:
-	 * - MOCs are detected by tag
-	 * - Other types are inferred from their folder location
-	 * 
 	 * @param file The file to analyze
 	 * @returns The detected note-type or null if not a plugin file
 	 */
@@ -1711,10 +1404,6 @@ note-type: prompt
 
 	/**
 	 * Gets all MOC files in the vault.
-	 * 
-	 * Scans all markdown files and returns those tagged as MOCs.
-	 * Used for reorganization operations and relationship management.
-	 * 
 	 * @returns Array of all MOC files in the vault
 	 */
 	async getAllMOCs(): Promise<TFile[]> {
@@ -1723,17 +1412,6 @@ note-type: prompt
 
 	/**
 	 * Checks if making a MOC a parent of another would create a circular dependency.
-	 * 
-	 * Prevents invalid hierarchies where:
-	 * - A MOC would become its own ancestor
-	 * - Two MOCs would be each other's parent/child
-	 * 
-	 * Uses breadth-first search through the link graph starting from the MOC.
-	 * 
-	 * WHY: Circular dependencies would break navigation and could cause infinite loops
-	 * in traversal algorithms. BFS is used because it finds cycles efficiently without
-	 * needing to traverse the entire graph.
-	 * 
 	 * @param moc The MOC that would become a child
 	 * @param potentialParent The MOC that would become the parent
 	 * @returns true if this relationship would create a cycle
@@ -1742,8 +1420,7 @@ note-type: prompt
 		const visited = new Set<string>();
 		const queue: TFile[] = [moc];
 		
-		// WHY: BFS traversal starting from the child MOC to see if we can reach the potential parent
-		// If we can reach it, making it the parent would create a cycle
+		// BFS traversal to detect if potential parent is reachable from child
 		while (queue.length > 0) {
 			const currentFile = queue.shift()!;
 			if (visited.has(currentFile.path)) continue;
@@ -1768,19 +1445,7 @@ note-type: prompt
 	// =================================================================================
 
 	/**
-	 * Selects a random emoji from a wide range of Unicode blocks.
-	 * Used to provide visual identification for MOCs.
-	 * 
-	 * Emoji ranges include:
-	 * - Emoticons (smileys and emotion)
-	 * - Miscellaneous Symbols and Pictographs
-	 * - Transport and Map Symbols
-	 * - Supplemental Symbols and Pictographs
-	 * 
-	 * WHY: These specific ranges were chosen because they contain colorful, distinctive
-	 * emojis that work well as visual markers. We avoid ranges with less recognizable
-	 * symbols or those that might not render properly on all systems.
-	 * 
+	 * Selects a random emoji from a wide range of Unicode blocks for MOC visual identification.
 	 * @returns A single random emoji character
 	 */
 	private getRandomEmoji(): string {
@@ -1791,8 +1456,7 @@ note-type: prompt
 			[0x1F900, 0x1F9FF], // Supplemental Symbols and Pictographs
 		];
 		
-		// WHY: First select a range randomly, then a code point within that range
-		// This ensures even distribution across all emoji categories
+		// Select a range randomly, then a code point within that range
 		const range = emojiRanges[Math.floor(Math.random() * emojiRanges.length)];
 		const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
 		return String.fromCodePoint(codePoint);
@@ -1800,16 +1464,6 @@ note-type: prompt
 
 	/**
 	 * Generates a random color for MOC folders using HSL color space.
-	 * 
-	 * HSL (Hue, Saturation, Lightness) is used because it provides:
-	 * - Even distribution across the color spectrum (hue: 0-360°)
-	 * - Consistent saturation for vibrant colors (60-90%)
-	 * - Appropriate lightness for both light and dark themes (45-65%)
-	 * 
-	 * WHY: HSL ensures all generated colors are visually distinct and readable
-	 * while maintaining consistent vibrancy. Fixed saturation/lightness ranges
-	 * prevent colors that are too pale or too dark to be effective visual markers.
-	 * 
 	 * @returns An object containing HSL values and CSS color strings for light/dark themes
 	 */
 	private generateRandomColor(): { hue: number, saturation: number, lightness: number, lightColor: string, darkColor: string } {
@@ -1823,8 +1477,6 @@ note-type: prompt
 		const lightness = 45 + Math.floor(Math.random() * 20);
 		
 		// Generate theme-appropriate color variants
-		// WHY: Light theme uses the base color with reduced opacity for backgrounds
-		// Dark theme uses slightly higher lightness for better visibility
 		const lightColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 		const darkColor = `hsl(${hue}, ${saturation}%, ${Math.min(lightness + 10, 75)}%)`;
 		
@@ -1837,15 +1489,7 @@ note-type: prompt
 // MODAL DIALOGS
 // =================================================================================
 
-/**
- * Modal for displaying vault update plans and confirming execution.
- * 
- * Shows:
- * - Total number of files to update
- * - Detailed list of files and their required changes
- * - Warning about file modifications
- * - Confirm/Cancel buttons
- */
+/** Modal for displaying vault update plans and confirming execution */
 class VaultUpdateModal extends Modal {
 	constructor(
 		app: App,
@@ -1855,12 +1499,7 @@ class VaultUpdateModal extends Modal {
 		super(app);
 	}
 
-	/**
-	 * Renders the vault update modal content.
-	 * 
-	 * Creates a detailed view of all pending updates with
-	 * file paths and specific changes listed for each file.
-	 */
+	/** Renders the vault update modal content */
 	onOpen() {
 		const { contentEl } = this;
 		contentEl.createEl('h2', { text: 'Update Vault to Latest System' });
@@ -1978,8 +1617,6 @@ class CreateMOCModal extends Modal {
 				await this.plugin.createPrompt(mocFile, promptName);
 				
 				// Update styles after prompt creation to ensure MOC folder styling is applied
-				// WHY: Creating a prompt can sometimes trigger style updates that need to include
-				// the MOC's unique color, so we ensure styles are current after prompt creation
 				setTimeout(async () => {
 					await this.plugin.updateMOCStyles();
 				}, 150);
@@ -2016,17 +1653,7 @@ class CreateMOCModal extends Modal {
 	}
 }
 
-/**
- * Modal for adding content to an existing MOC.
- * 
- * Presents buttons for creating:
- * - Sub-MOC
- * - Note  
- * - Resource
- * - Prompt
- * 
- * Each button opens a secondary modal for naming the new item.
- */
+/** Modal for adding content to an existing MOC */
 class AddToMOCModal extends Modal {
 	constructor(
 		app: App, 
@@ -2062,14 +1689,7 @@ class AddToMOCModal extends Modal {
 	}
 }
 
-/**
- * Generic modal for creating any type of item (note, resource, etc.).
- * 
- * Reusable component that:
- * - Shows appropriate label based on item type
- * - Handles text input and validation
- * - Supports Enter key submission
- */
+/** Generic modal for creating any type of item (note, resource, etc.) */
 class CreateItemModal extends Modal {
 	constructor(
 		app: App,
@@ -2103,14 +1723,7 @@ class CreateItemModal extends Modal {
 	}
 }
 
-/**
- * Modal for adding optional descriptions to prompt iterations.
- * 
- * Features:
- * - Optional description input
- * - Skip button for no description
- * - Description becomes part of filename (e.g., "v2 - description")
- */
+/** Modal for adding optional descriptions to prompt iterations */
 class PromptDescriptionModal extends Modal {
 	constructor(app: App, private onSubmit: (description: string) => void) {
 		super(app);
@@ -2147,15 +1760,7 @@ class PromptDescriptionModal extends Modal {
 	}
 }
 
-/**
- * Modal for confirming deletion of all plugin-managed files.
- * 
- * Shows:
- * - Number of files to delete
- * - List of file paths (truncated if too many)
- * - Warning about permanent deletion
- * - Styled delete button to indicate danger
- */
+/** Modal for confirming deletion of all plugin-managed files */
 class CleanupConfirmationModal extends Modal {
 	constructor(
 		app: App, 
@@ -2190,15 +1795,7 @@ class CleanupConfirmationModal extends Modal {
 	}
 }
 
-/**
- * Context-aware modal for MOC reorganization options.
- * 
- * Shows different options based on MOC type:
- * - Root MOCs: Can be moved under a parent
- * - Sub-MOCs: Can be promoted to root or moved to different parent
- * 
- * Prevents circular dependencies in MOC relationships.
- */
+/** Context-aware modal for MOC reorganization options */
 class ReorganizeMOCModal extends Modal {
 	constructor(
 		app: App,
@@ -2252,12 +1849,7 @@ class ReorganizeMOCModal extends Modal {
 	}
 }
 
-/**
- * Modal for creating a new parent MOC during reorganization.
- * 
- * Used when moving a root MOC under a new parent that doesn't exist yet.
- * Creates the parent MOC and immediately moves the child under it.
- */
+/** Modal for creating a new parent MOC during reorganization */
 class CreateParentMOCModal extends Modal {
 	constructor(
 		app: App,
@@ -2295,15 +1887,7 @@ class CreateParentMOCModal extends Modal {
 	}
 }
 
-/**
- * Modal for selecting an existing MOC as a parent during reorganization.
- * 
- * Features:
- * - Scrollable list of available MOCs
- * - Filters out MOCs that would create circular dependencies
- * - Sorted alphabetically by path
- * - Different behavior for moving root vs sub MOCs
- */
+/** Modal for selecting an existing MOC as a parent during reorganization */
 class SelectParentMOCModal extends Modal {
 	constructor(
 		app: App,

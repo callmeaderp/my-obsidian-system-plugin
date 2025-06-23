@@ -279,12 +279,12 @@ The plugin uses multiple specialized modal classes:
 
 7. **Cross-Platform Path Handling**: Resolved CSS path loading issues by properly handling folder name vs plugin ID mismatches.
 
-**Code Documentation Update (2025-06-23)**: Major documentation enhancement to align with new global CLAUDE.md standards:
-- Added comprehensive "WHY" comments throughout the codebase explaining design decisions and technical choices
-- Enhanced complex logic sections with detailed inline comments explaining the reasoning behind algorithms
-- Added error handling documentation to clarify how failures are managed and why specific approaches were chosen
-- Maintained existing JSDoc documentation while adding strategic context about implementation decisions
-- Focus on preventing technical debt through clear explanation of architectural choices
+**Code Documentation Cleanup (2025-06-23)**: Updated plugin comments to follow standard TypeScript conventions:
+- Removed verbose "WHY:" explanations from all comments throughout the codebase
+- Simplified JSDoc comments to concise, standard format with essential @param and @returns information
+- Converted multi-line explanatory comments to brief, focused descriptions
+- Maintained code functionality while improving readability and following industry standards
+- All comments now follow conventional TypeScript documentation practices
 
 ## Running Issue Log
 
@@ -337,3 +337,14 @@ The plugin uses multiple specialized modal classes:
 - Added class-level documentation for the main plugin class and all modal classes
 - Added section headers with explanatory comments throughout the codebase
 **Resolution**: Plugin now has clean, well-documented code without non-functional color system. All functions have comprehensive comments explaining their purpose and implementation details.
+
+### Comment Standards Update (2025-06-23)
+**Issue**: Plugin comments were overly verbose with extensive "WHY:" explanations that didn't follow standard TypeScript documentation practices.
+**Root Cause**: Comments were written with excessive explanatory detail that made the codebase harder to read and maintain.
+**Fix**: Comprehensive comment cleanup to follow industry standards:
+- Removed all verbose "WHY:" explanation blocks throughout the codebase
+- Simplified JSDoc comments to standard format with essential information only
+- Converted multi-line explanatory comments to concise, focused descriptions
+- Fixed malformed comment block that was causing 786 TypeScript compilation errors
+- Maintained all code functionality while dramatically improving readability
+**Resolution**: Plugin now follows conventional TypeScript documentation practices with clean, professional comments that are easy to read and maintain.
