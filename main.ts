@@ -17,6 +17,10 @@ const DEFAULT_SETTINGS: PluginSettings = {};
 /**
  * Defines the subfolder names within a MOC's primary folder.
  * Each MOC folder contains these three subfolders for organizing different content types.
+ * 
+ * WHY: This structure was chosen to provide clear separation of concerns within each MOC.
+ * Having dedicated folders prevents naming conflicts and makes the file explorer more scannable.
+ * The folder names are intentionally plural to indicate they contain collections.
  */
 const FOLDERS = {
 	Notes: 'Notes',
@@ -27,6 +31,11 @@ const FOLDERS = {
 /**
  * Defines the standard order of sections within a MOC file.
  * This order is enforced when adding new content to ensure consistency.
+ * 
+ * WHY: This specific order follows a hierarchy from most abstract (other MOCs) to most
+ * concrete (prompts). MOCs come first as they represent the highest level of organization,
+ * followed by content (Notes), reference materials (Resources), and finally AI interactions (Prompts).
+ * This ordering helps users mentally navigate from structure to content to tools.
  */
 const SECTION_ORDER = ['MOCs', 'Notes', 'Resources', 'Prompts'] as const;
 type SectionType = typeof SECTION_ORDER[number];
@@ -34,6 +43,16 @@ type SectionType = typeof SECTION_ORDER[number];
 /**
  * Defines the standard emoji prefixes for different note types.
  * These emojis are prepended to filenames for visual identification.
+ * 
+ * WHY: Fixed emojis for non-MOC types provide instant visual recognition in the file explorer.
+ * The specific choices:
+ * - 📝 (Notes): Universal symbol for writing/documentation
+ * - 📁 (Resources): Represents stored reference materials
+ * - 🤖 (Prompts): Clearly indicates AI/LLM interaction files
+ * - 🔵 (MOCs fallback): Only used as a default; actual MOCs get random emojis for distinction
+ * 
+ * Random emojis for MOCs were chosen to make each MOC visually unique and memorable,
+ * helping with quick identification when scanning many MOCs.
  */
 const NOTE_TYPES = {
 	MOCs: { emoji: '🔵' }, // Default for sub-MOCs, though new ones get random emojis
@@ -95,18 +114,25 @@ export default class MOCSystemPlugin extends Plugin {
 	/**
 	 * Plugin initialization and setup.
 	 * Loads settings, registers commands, and sets up event listeners.
+	 * 
+	 * WHY: The initialization order matters - settings must load first as they may affect
+	 * other operations, then styles for immediate visual feedback, then commands become available.
 	 */
 	async onload() {
 		await this.loadSettings();
 		await this.loadStyles();
 
 		// --- Command Registration ---
+		// WHY: This is the primary command and comes first. Context-aware creation reduces
+		// cognitive load by determining the appropriate action based on current location.
 		this.addCommand({
 			id: 'moc-context-create',
 			name: 'Create MOC or add content',
 			callback: () => this.handleContextCreate()
 		});
 
+		// WHY: checkCallback is used here instead of callback because this command should only
+		// be available when the active file is a MOC. This prevents user confusion and errors.
 		this.addCommand({
 			id: 'reorganize-moc',
 			name: 'Reorganize MOC',
@@ -159,6 +185,8 @@ export default class MOCSystemPlugin extends Plugin {
 		});
 
 		// --- Event Listeners ---
+		// WHY: Automatic broken link cleanup maintains vault integrity without user intervention.
+		// This prevents the accumulation of dead links which could confuse users and break navigation.
 		this.registerEvent(
 			this.app.vault.on('delete', (file) => {
 				if (file instanceof TFile) {
@@ -258,6 +286,10 @@ export default class MOCSystemPlugin extends Plugin {
 	 * 4. Creates the MOC file with appropriate frontmatter
 	 * 5. Opens the newly created file in the workspace
 	 * 
+	 * WHY: Each MOC gets its own folder to prevent file sprawl and maintain clear boundaries
+	 * between different knowledge domains. The MOC file has the same name as its folder for
+	 * consistency and to reinforce the 1:1 relationship between MOC and folder.
+	 * 
 	 * @param name The name of the new MOC (without emoji prefix or 'MOC' suffix)
 	 * @returns The newly created MOC file
 	 */
@@ -266,6 +298,8 @@ export default class MOCSystemPlugin extends Plugin {
 		const randomEmoji = this.getRandomEmoji();
 		
 		// Create folder and file paths
+		// WHY: The folder and file share the same name to reinforce that a MOC
+		// represents both a concept (the file) and a container (the folder).
 		const mocFolderName = `${randomEmoji} ${name} MOC`;
 		const mocFilePath = `${mocFolderName}/${mocFolderName}.md`;
 		
@@ -273,6 +307,9 @@ export default class MOCSystemPlugin extends Plugin {
 		await this.ensureMOCFolderStructure(mocFolderName);
 		
 		// Create the MOC file with minimal frontmatter
+		// WHY: Minimal frontmatter keeps MOCs clean and focused on content. The 'tags' array
+		// format is used for Obsidian compatibility, while 'note-type' provides plugin-specific
+		// metadata. No content is added to encourage users to define their own structure.
 		const content = `---
 tags:
   - moc
@@ -481,6 +518,10 @@ note-type: prompt
 	 * The reorganization ensures that plugin-managed sections always appear
 	 * at the top of the file in the correct order, with any user content below.
 	 * 
+	 * WHY: This approach preserves user customizations while enforcing structure. By moving
+	 * plugin sections to the top, we ensure consistency across all MOCs while allowing users
+	 * to add custom content below without interference.
+	 * 
 	 * @param moc The MOC file to modify
 	 * @param section The section to add the link to (must be one of SECTION_ORDER)
 	 * @param newFile The file to link to (will use its basename for the link)
@@ -489,8 +530,11 @@ note-type: prompt
 		let content = await this.app.vault.read(moc);
 		let lines = content.split('\n');
 		
+		// Identify where frontmatter ends to avoid modifying it
 		let frontmatterEnd = 0;
 		if (lines[0] === '---') {
+			// Find the closing '---' after the opening one
+			// WHY: slice(1) skips the first '---' to find the closing one
 			frontmatterEnd = lines.slice(1).indexOf('---') + 2;
 		}
 		
@@ -504,6 +548,8 @@ note-type: prompt
 			const currentSectionOrderIndex = SECTION_ORDER.indexOf(section);
 
 			// Find the next existing section to insert before.
+			// WHY: We insert new sections before later sections to maintain the standard order.
+			// This ensures MOCs always comes before Notes, which comes before Resources, etc.
 			for (let i = currentSectionOrderIndex + 1; i < SECTION_ORDER.length; i++) {
 				const nextSection = SECTION_ORDER[i];
 				if (sectionIndices.has(nextSection)) {
@@ -513,11 +559,13 @@ note-type: prompt
 			}
 
 			// If no later sections exist, append after the last known plugin section.
+			// WHY: This keeps all plugin sections grouped together before user content.
 			if (insertIndex === frontmatterEnd && sectionIndices.size > 0) {
 				const lastSectionIndex = Math.max(...Array.from(sectionIndices.values()));
 				insertIndex = this.findSectionEnd(reorganizedLines, lastSectionIndex);
 			}
 
+			// WHY: Empty lines before and after provide visual separation between sections
 			const newSectionContent = [`## ${section}`, ``, `- [[${newFile.basename}]]`, ``];
 			reorganizedLines.splice(insertIndex, 0, ...newSectionContent);
 
@@ -546,6 +594,10 @@ note-type: prompt
 	 * 
 	 * This ensures consistent MOC structure while preserving user customizations.
 	 * 
+	 * WHY: This complex reorganization is necessary because users might manually edit MOCs
+	 * and disorder sections. By enforcing order only for plugin sections, we maintain
+	 * structure without destroying user customizations.
+	 * 
 	 * @param lines The lines of the MOC file split by newlines
 	 * @param frontmatterEnd The index of the line after the closing '---' of frontmatter
 	 * @returns An object containing the reorganized lines and a map of section start indices
@@ -555,11 +607,14 @@ note-type: prompt
 		const otherContentLines: string[] = [];
 		const sectionIndices = new Map<SectionType, number>();
 
+		// Track which lines belong to plugin sections to avoid duplicating them
 		const consumedLineIndices = new Set<number>();
 
 		// 1. Extract all known plugin sections
+		// WHY: We iterate in SECTION_ORDER to maintain the desired sequence even during extraction
 		for (const sectionName of SECTION_ORDER) {
 			const header = `## ${sectionName}`;
+			// Start searching after frontmatter to avoid matching content within it
 			const startIndex = lines.findIndex((line, i) => i >= frontmatterEnd && line.trim() === header);
 
 			if (startIndex !== -1) {
@@ -568,6 +623,8 @@ note-type: prompt
 				pluginSections.push({ name: sectionName, content: sectionContent });
 
 				// Mark these lines as "consumed"
+				// WHY: This prevents the same lines from being included in otherContentLines,
+				// avoiding duplication when we rebuild the file
 				for (let i = startIndex; i < endIndex; i++) {
 					consumedLineIndices.add(i);
 				}
@@ -635,9 +692,14 @@ note-type: prompt
 	 * 4. Optionally adds a description to the filename
 	 * 5. Updates the prompt hub to include the new iteration
 	 * 
+	 * WHY: Version numbers provide clear evolution tracking for prompts. Finding the max version
+	 * ensures we don't accidentally overwrite existing iterations if versions were created out of order.
+	 * 
 	 * @param file The prompt iteration file to duplicate (must match pattern "*v\d+*")
 	 */
 	async duplicatePromptIteration(file: TFile) {
+		// Extract base name and version from filename
+		// WHY: The regex handles optional emoji prefix and captures name + version separately
 		const match = file.basename.match(/^(?:🤖\s+)?(.+?)\s*v(\d+)/);
 		if (!match) return;
 		
@@ -645,8 +707,12 @@ note-type: prompt
 		const promptsFolder = file.parent;
 		if (!promptsFolder) return;
 		
+		// Find all sibling files that are iterations of the same prompt
 		const siblings = promptsFolder.children.filter(f => f instanceof TFile && f.name.includes(baseName) && f.name.match(/v(\d+)/)) as TFile[];
 		
+		// Find highest existing version to determine next version
+		// WHY: We scan all siblings rather than just incrementing from current file's version
+		// to handle cases where versions might have been created out of order
 		let maxVersion = 0;
 		for (const pFile of siblings) {
 			const vMatch = pFile.basename.match(/v(\d+)/);
@@ -807,6 +873,9 @@ note-type: prompt
 	 * 2. Moves the MOC folder to the vault root
 	 * 3. Opens the promoted MOC in the workspace
 	 * 
+	 * WHY: Promotion allows users to elevate a sub-topic to a main topic as their knowledge
+	 * structure evolves. Removing parent links first prevents broken references.
+	 * 
 	 * @param moc The sub-MOC to promote to root level
 	 */
 	async promoteSubMOCToRoot(moc: TFile) {
@@ -815,8 +884,10 @@ note-type: prompt
 			if (!mocFolder) throw new Error('MOC folder not found.');
 
 			// The new path is just the folder's name at the vault root.
+			// WHY: No path prefix means vault root in Obsidian's file system
 			const newFolderPath = mocFolder.name;
 			
+			// WHY: Remove links first to prevent broken references after the move
 			await this.removeFromParentMOCs(moc);
 			await this.app.vault.rename(mocFolder, newFolderPath);
 			
@@ -968,6 +1039,10 @@ note-type: prompt
 	 * 3. MOCs missing required suffix or emoji prefix
 	 * 4. Other file types missing their emoji prefixes
 	 * 
+	 * WHY: This comprehensive checking allows us to modernize vaults created with older
+	 * versions of the plugin or manually created files that follow the naming convention
+	 * but lack proper metadata.
+	 * 
 	 * @param file The file to analyze
 	 * @returns Array of human-readable update descriptions
 	 */
@@ -978,6 +1053,8 @@ note-type: prompt
 		
 		const isPluginFile = noteType && ['moc', 'note', 'resource', 'prompt'].includes(noteType);
 		// A file is a potential plugin file if it looks like one, even without metadata
+		// WHY: We check both metadata and path/naming patterns to catch files created manually
+		// or with older plugin versions that might not have complete metadata
 		const isLegacyFile = file.basename.includes('MOC') || file.path.includes(FOLDERS.Notes) || file.path.includes(FOLDERS.Resources) || file.path.includes(FOLDERS.Prompts);
 
 		if (!isPluginFile && !isLegacyFile) return [];
@@ -998,6 +1075,8 @@ note-type: prompt
 			if (!file.basename.endsWith(' MOC')) updates.push('Add "MOC" suffix to filename');
 			
 			// Check for emoji prefix using Unicode ranges
+			// WHY: We check multiple Unicode ranges to catch any emoji, not just specific ones.
+			// The 'u' flag enables proper Unicode matching for emoji characters.
 			if (!/^[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(file.basename)) {
 				updates.push('Add random emoji prefix to filename');
 			}
@@ -1161,6 +1240,8 @@ note-type: prompt
 					await this.app.vault.delete(file);
 					deletedCount++;
 				} catch (error) {
+					// WHY: Individual file deletion failures shouldn't stop the cleanup process.
+					// We log the error for debugging but continue with remaining files.
 					console.error(`Failed to delete ${file.path}:`, error);
 				}
 			}
@@ -1311,6 +1392,10 @@ note-type: prompt
 	 * 
 	 * Uses breadth-first search through the link graph starting from the MOC.
 	 * 
+	 * WHY: Circular dependencies would break navigation and could cause infinite loops
+	 * in traversal algorithms. BFS is used because it finds cycles efficiently without
+	 * needing to traverse the entire graph.
+	 * 
 	 * @param moc The MOC that would become a child
 	 * @param potentialParent The MOC that would become the parent
 	 * @returns true if this relationship would create a cycle
@@ -1319,6 +1404,8 @@ note-type: prompt
 		const visited = new Set<string>();
 		const queue: TFile[] = [moc];
 		
+		// WHY: BFS traversal starting from the child MOC to see if we can reach the potential parent
+		// If we can reach it, making it the parent would create a cycle
 		while (queue.length > 0) {
 			const currentFile = queue.shift()!;
 			if (visited.has(currentFile.path)) continue;
@@ -1326,6 +1413,7 @@ note-type: prompt
 			
 			if (currentFile.path === potentialParent.path) return true; // Cycle detected!
 			
+			// Only follow links to other MOCs to build the hierarchy graph
 			const links = this.app.metadataCache.getFileCache(currentFile)?.links ?? [];
 			for (const link of links) {
 				const linkedFile = this.app.metadataCache.getFirstLinkpathDest(link.link, currentFile.path);
@@ -1351,6 +1439,10 @@ note-type: prompt
 	 * - Transport and Map Symbols
 	 * - Supplemental Symbols and Pictographs
 	 * 
+	 * WHY: These specific ranges were chosen because they contain colorful, distinctive
+	 * emojis that work well as visual markers. We avoid ranges with less recognizable
+	 * symbols or those that might not render properly on all systems.
+	 * 
 	 * @returns A single random emoji character
 	 */
 	private getRandomEmoji(): string {
@@ -1361,6 +1453,8 @@ note-type: prompt
 			[0x1F900, 0x1F9FF], // Supplemental Symbols and Pictographs
 		];
 		
+		// WHY: First select a range randomly, then a code point within that range
+		// This ensures even distribution across all emoji categories
 		const range = emojiRanges[Math.floor(Math.random() * emojiRanges.length)];
 		const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
 		return String.fromCodePoint(codePoint);

@@ -257,6 +257,13 @@ The plugin uses multiple specialized modal classes:
 
 3. **Hierarchical Prompt Organization**: Redesigned the prompt system so each prompt gets its own dedicated subfolder within the Prompts folder. Structure changed from flat `MOC/Prompts/files` to hierarchical `MOC/Prompts/PromptName/files`, providing better organization and preventing naming conflicts between different prompts and their iterations.
 
+**Code Documentation Update (2025-06-23)**: Major documentation enhancement to align with new global CLAUDE.md standards:
+- Added comprehensive "WHY" comments throughout the codebase explaining design decisions and technical choices
+- Enhanced complex logic sections with detailed inline comments explaining the reasoning behind algorithms
+- Added error handling documentation to clarify how failures are managed and why specific approaches were chosen
+- Maintained existing JSDoc documentation while adding strategic context about implementation decisions
+- Focus on preventing technical debt through clear explanation of architectural choices
+
 ## Running Issue Log
 
 ### Duplicate Prompt Iteration Command (2025-06-18)
