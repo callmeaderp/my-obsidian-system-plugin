@@ -1306,9 +1306,14 @@ abstract class BaseModal extends Modal {
 				text: btn.text, 
 				cls: btn.primary ? 'mod-cta' : '' 
 			});
-			element.addEventListener('click', () => {
-				btn.action();
-				this.close();
+			element.addEventListener('click', async () => {
+				try {
+					await Promise.resolve(btn.action());
+				} catch (error) {
+					console.error('Modal action error:', error);
+				} finally {
+					this.close();
+				}
 			});
 		});
 	}
@@ -1322,16 +1327,25 @@ abstract class BaseModal extends Modal {
 
 	protected handleEnterKey(callback: () => void, ...inputs: HTMLInputElement[]) {
 		inputs.forEach(input => {
-			input.addEventListener('keypress', (e) => {
+			input.addEventListener('keypress', async (e) => {
 				if (e.key === 'Enter') {
 					e.preventDefault();
-					callback();
+					try {
+						await Promise.resolve(callback());
+					} catch (error) {
+						console.error('Modal enter key action error:', error);
+					} finally {
+						this.close();
+					}
 				}
 			});
 		});
 	}
 
-	onClose() { this.contentEl.empty(); }
+	onClose() { 
+		// Clear all content and event listeners
+		this.contentEl.empty(); 
+	}
 }
 
 /**
@@ -1456,7 +1470,10 @@ class AddToMOCModal extends BaseModal {
 			button.style.cssText = 'display: block; width: 100%; margin-bottom: 10px;';
 			button.addEventListener('click', () => {
 				this.close();
-				new CreateItemModal(this.app, option.label, option.action).open();
+				// Small delay to ensure proper modal cleanup before opening new one
+				setTimeout(() => {
+					new CreateItemModal(this.app, option.label, option.action).open();
+				}, 50);
 			});
 		});
 	}
@@ -1544,13 +1561,18 @@ class ReorganizeMOCModal extends BaseModal {
 
 		if (isRootMOC) {
 			this.contentEl.createEl('p', { text: 'This is a root MOC. You can move it under another MOC.' });
-			createButton('Move under a NEW parent MOC', () => 
-				new CreateParentMOCModal(this.app, this.moc, this.plugin).open(), true);
+			createButton('Move under a NEW parent MOC', () => {
+				setTimeout(() => {
+					new CreateParentMOCModal(this.app, this.moc, this.plugin).open();
+				}, 50);
+			}, true);
 			createButton('Move under an EXISTING parent MOC', async () => {
 				const availableParents = (await this.plugin.getAllMOCs())
 					.filter(m => m.path !== this.moc.path && !this.plugin.detectCircularDependency(this.moc, m));
 				if (availableParents.length === 0) return new Notice('No suitable parent MOCs available.');
-				new SelectParentMOCModal(this.app, this.moc, availableParents, this.plugin, false).open();
+				setTimeout(() => {
+					new SelectParentMOCModal(this.app, this.moc, availableParents, this.plugin, false).open();
+				}, 50);
 			});
 		} else {
 			this.contentEl.createEl('p', { text: 'This is a sub-MOC. You can promote it or move it.' });
@@ -1559,7 +1581,9 @@ class ReorganizeMOCModal extends BaseModal {
 				const availableParents = (await this.plugin.getAllMOCs())
 					.filter(m => m.path !== this.moc.path && !this.plugin.detectCircularDependency(this.moc, m));
 				if (availableParents.length === 0) return new Notice('No suitable parent MOCs available.');
-				new SelectParentMOCModal(this.app, this.moc, availableParents, this.plugin, true).open();
+				setTimeout(() => {
+					new SelectParentMOCModal(this.app, this.moc, availableParents, this.plugin, true).open();
+				}, 50);
 			});
 		}
 	}
