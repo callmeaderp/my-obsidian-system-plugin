@@ -71,12 +71,18 @@ interface CreateConfig { name: string; parentMOC?: TFile; type: NoteType; descri
 export default class MOCSystemPlugin extends Plugin {
 	settings: PluginSettings;
 	private styleElement: HTMLStyleElement | null = null;
+	private sessionStartTime: number;
+	private initialFileSet: Set<string>;
 
 	/**
 	 * Plugin initialization - loads settings, registers commands, and sets up event listeners.
 	 * Sets up style loading with appropriate delays for Obsidian's initialization sequence.
 	 */
 	async onload() {
+		// Track session start time and existing files for testing undo functionality
+		this.sessionStartTime = Date.now();
+		this.initialFileSet = new Set(this.app.vault.getMarkdownFiles().map(f => f.path));
+		
 		await this.loadSettings();
 		this.initializeStyles();
 		this.registerCommands();
@@ -95,7 +101,8 @@ export default class MOCSystemPlugin extends Plugin {
 		const commands = [
 			{ id: 'moc-context-create', name: 'Create MOC or add content', callback: () => this.handleContextCreate() },
 			{ id: 'update-vault-system', name: 'Update vault to latest system', callback: () => this.updateVaultToLatestSystem() },
-			{ id: 'cleanup-moc-system', name: 'Cleanup MOC system files', callback: () => this.cleanupMOCSystem() }
+			{ id: 'cleanup-moc-system', name: 'Cleanup MOC system files', callback: () => this.cleanupMOCSystem() },
+			{ id: 'undo-test-changes', name: 'Undo test changes (since session start)', callback: () => this.undoTestChanges() }
 		];
 
 		const conditionalCommands = [
@@ -1139,6 +1146,47 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		}
 	}
 
+	/**
+	 * Undoes test changes by deleting files created since the plugin session started.
+	 * Only deletes plugin-created files for safety.
+	 */
+	async undoTestChanges() {
+		const currentFiles = this.app.vault.getMarkdownFiles();
+		const newFiles = currentFiles.filter(file => 
+			!this.initialFileSet.has(file.path) && this.isPluginCreatedFile(file)
+		);
+
+		if (newFiles.length === 0) {
+			new Notice('No test files to undo.');
+			return;
+		}
+
+		new UndoTestChangesModal(this.app, newFiles, async () => {
+			let deletedCount = 0;
+			for (const file of newFiles) {
+				try {
+					await this.app.vault.delete(file);
+					deletedCount++;
+				} catch (error) {
+					console.error(`Failed to delete test file ${file.path}:`, error);
+				}
+			}
+			await this.updateMOCStyles();
+			new Notice(`Undone test changes! Deleted ${deletedCount} files created this session.`);
+		}).open();
+	}
+
+	/**
+	 * Checks if a file was created by this plugin based on frontmatter.
+	 * @param file File to check
+	 * @returns True if file has plugin-specific frontmatter
+	 */
+	private isPluginCreatedFile(file: TFile): boolean {
+		const cache = this.app.metadataCache.getFileCache(file);
+		const noteType = cache?.frontmatter?.['note-type'];
+		return noteType && ['moc', 'note', 'resource', 'prompt'].includes(noteType);
+	}
+
 
 	// =================================================================================
 	// HELPER & UTILITY METHODS
@@ -1643,5 +1691,39 @@ class SelectParentMOCModal extends BaseModal {
 		});
 
 		this.createButtons([{ text: 'Cancel', action: () => {} }]);
+	}
+}
+
+/** Modal for confirming undo test changes */
+class UndoTestChangesModal extends BaseModal {
+	constructor(app: App, private filesToDelete: TFile[], private onConfirm: () => void) {
+		super(app);
+	}
+
+	onOpen() {
+		this.contentEl.createEl('h2', { text: 'Undo Test Changes' });
+		this.contentEl.createEl('p', { 
+			text: `This will delete ${this.filesToDelete.length} files created since Obsidian started.` 
+		});
+		this.contentEl.createEl('p', { 
+			text: 'Only plugin-created files (MOCs, Notes, Resources, Prompts) will be deleted.',
+			cls: 'mod-warning'
+		});
+
+		if (this.filesToDelete.length > 0) {
+			this.contentEl.createEl('h3', { text: 'Files to be deleted:' });
+			const fileList = this.contentEl.createEl('ul', { cls: 'moc-system-file-list' });
+			this.filesToDelete.slice(0, 15).forEach(file => 
+				fileList.createEl('li', { text: file.path })
+			);
+			if (this.filesToDelete.length > 15) {
+				fileList.createEl('li', { text: `... and ${this.filesToDelete.length - 15} more.` });
+			}
+		}
+
+		this.createButtons([
+			{ text: 'Cancel', action: () => {} },
+			{ text: `Delete ${this.filesToDelete.length} Files`, action: this.onConfirm }
+		]);
 	}
 }
