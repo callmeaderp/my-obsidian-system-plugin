@@ -184,7 +184,8 @@ export default class MOCSystemPlugin extends Plugin {
 		for (const moc of allMOCs) {
 			const frontmatter = this.app.metadataCache.getFileCache(moc)?.frontmatter;
 			if (frontmatter?.['light-color'] && frontmatter?.['dark-color'] && moc.parent) {
-				const { lightColor, darkColor } = frontmatter;
+				const lightColor = frontmatter['light-color'];
+				const darkColor = frontmatter['dark-color'];
 				const escapedPath = moc.parent.path.replace(/['"\\]/g, '\\$&');
 				
 				colorStyles.push(
@@ -434,12 +435,12 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		if (sectionLineIndex === undefined) {
 			// Section doesn't exist, create it in the correct order.
 			let insertIndex = frontmatterEnd;
-			const currentSectionOrderIndex = SECTION_ORDER.indexOf(section);
+			const currentSectionOrderIndex = CONFIG.SECTION_ORDER.indexOf(section);
 
 			// Find the next existing section to insert before.
 			// Insert new sections before later sections to maintain standard order
-			for (let i = currentSectionOrderIndex + 1; i < SECTION_ORDER.length; i++) {
-				const nextSection = SECTION_ORDER[i];
+			for (let i = currentSectionOrderIndex + 1; i < CONFIG.SECTION_ORDER.length; i++) {
+				const nextSection = CONFIG.SECTION_ORDER[i];
 				if (sectionIndices.has(nextSection)) {
 					insertIndex = sectionIndices.get(nextSection)!;
 					break;
@@ -487,7 +488,7 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 
 		// 1. Extract all known plugin sections
 		// Iterate in SECTION_ORDER to maintain desired sequence
-		for (const sectionName of SECTION_ORDER) {
+		for (const sectionName of CONFIG.SECTION_ORDER) {
 			const header = `## ${sectionName}`;
 			// Start searching after frontmatter to avoid matching content within it
 			const startIndex = lines.findIndex((line, i) => i >= frontmatterEnd && line.trim() === header);
@@ -932,7 +933,7 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		
 		// The grandparent should be the Prompts folder
 		const promptsFolder = currentFolder.parent;
-		if (!promptsFolder || promptsFolder.name !== FOLDERS.Prompts) {
+		if (!promptsFolder || promptsFolder.name !== CONFIG.FOLDERS.Prompts) {
 			console.warn(`Cannot migrate prompt hub ${file.path}: expected to be in Prompts subfolder`);
 			return file;
 		}
@@ -1087,7 +1088,7 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 
 	/** Migration and detection helper methods */
 	private needsFolderMigration(file: TFile): boolean {
-		return this.isMOC(file) && this.isRootMOC(file) && file.parent?.isRoot();
+		return this.isMOC(file) && this.isRootMOC(file) && (file.parent?.isRoot() ?? false);
 	}
 
 	private needsPromptHubMigration(file: TFile): boolean {
