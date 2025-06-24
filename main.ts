@@ -4,13 +4,9 @@ import { App, Modal, Notice, Plugin, TFile, TFolder, normalizePath } from 'obsid
 // PLUGIN CONSTANTS AND TYPES
 // =================================================================================
 
-/** Plugin settings interface */
 type PluginSettings = Record<string, never>;
-
-/** Default plugin settings */
 const DEFAULT_SETTINGS: PluginSettings = {};
 
-/** Configuration constants */
 const CONFIG = {
 	FOLDERS: {
 		Notes: 'Notes',
@@ -45,7 +41,6 @@ const CONFIG = {
 type SectionType = typeof CONFIG.SECTION_ORDER[number];
 type NoteType = 'moc' | 'note' | 'resource' | 'prompt';
 
-/** Unified file creation configuration */
 interface FileConfig {
 	type: NoteType;
 	emoji: string;
@@ -59,7 +54,6 @@ interface FileConfig {
 // INTERFACES
 // =================================================================================
 
-/** Vault update interfaces */
 interface UpdateResult { file: TFile; changes: string[]; success: boolean; error?: string; }
 interface VaultUpdatePlan { filesToUpdate: TFile[]; updateSummary: Map<TFile, string[]>; totalChanges: number; }
 interface ColorInfo { hue: number; saturation: number; lightness: number; lightColor: string; darkColor: string; }
@@ -78,7 +72,10 @@ export default class MOCSystemPlugin extends Plugin {
 	settings: PluginSettings;
 	private styleElement: HTMLStyleElement | null = null;
 
-	/** Plugin initialization - loads settings, registers commands, and sets up event listeners */
+	/**
+	 * Plugin initialization - loads settings, registers commands, and sets up event listeners.
+	 * Sets up style loading with appropriate delays for Obsidian's initialization sequence.
+	 */
 	async onload() {
 		await this.loadSettings();
 		this.initializeStyles();
@@ -86,7 +83,6 @@ export default class MOCSystemPlugin extends Plugin {
 		this.registerEventListeners();
 	}
 
-	/** Initialize style loading with delays */
 	private initializeStyles() {
 		setTimeout(() => this.updateMOCStyles(), CONFIG.STYLE_DELAYS.INITIAL);
 		this.app.workspace.onLayoutReady(() => 
@@ -94,7 +90,6 @@ export default class MOCSystemPlugin extends Plugin {
 		);
 	}
 
-	/** Register all plugin commands */
 	private registerCommands() {
 
 		const commands = [
@@ -124,7 +119,6 @@ export default class MOCSystemPlugin extends Plugin {
 		}));
 	}
 
-	/** Register event listeners */
 	private registerEventListeners() {
 		this.registerEvent(
 			this.app.vault.on('delete', (file) => {
@@ -133,14 +127,11 @@ export default class MOCSystemPlugin extends Plugin {
 		);
 	}
 
-	/** Plugin cleanup */
 	onunload() { this.removeStyles(); }
 
-	/** Settings management */
 	async loadSettings() { this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); }
 	async saveSettings() { await this.saveData(this.settings); }
 
-	/** Style management */
 	removeStyles() {
 		if (this.styleElement) {
 			this.styleElement.remove();
@@ -148,7 +139,11 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 	}
 
-	/** Updates CSS styles to apply unique colors to MOC folders */
+	/**
+	 * Updates CSS styles to apply unique colors to MOC folders.
+	 * Combines base styles with dynamically generated color rules for each MOC.
+	 * @throws {Error} If style loading or generation fails
+	 */
 	async updateMOCStyles() {
 		try {
 			const baseCss = await this.loadBaseCss();
@@ -165,7 +160,10 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 	}
 
-	/** Load base CSS file */
+	/**
+	 * Loads the base CSS file from the plugin directory.
+	 * @returns Promise resolving to CSS content as string, empty string if file not found
+	 */
 	private async loadBaseCss(): Promise<string> {
 		try {
 			const cssPath = normalizePath(`${this.app.vault.configDir}/plugins/my-obsidian-system-plugin/styles.css`);
@@ -176,7 +174,11 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 	}
 
-	/** Generates CSS rules for individual MOC folder colors */
+	/**
+	 * Generates CSS rules for individual MOC folder colors based on frontmatter.
+	 * Creates theme-specific styles for both light and dark modes.
+	 * @returns Promise resolving to generated CSS string
+	 */
 	private async generateMOCColorStyles(): Promise<string> {
 		const allMOCs = await this.getAllMOCs();
 		const colorStyles: string[] = [];
@@ -197,7 +199,13 @@ export default class MOCSystemPlugin extends Plugin {
 		return colorStyles.join('\n');
 	}
 
-	/** Generate CSS for a specific theme */
+	/**
+	 * Generates CSS rules for a specific MOC folder path and theme.
+	 * @param path - Escaped folder path for CSS selector
+	 * @param color - HSL color string
+	 * @param theme - Theme variant ('light' or 'dark')
+	 * @returns CSS rule string with gradients and hover effects
+	 */
 	private generateThemeCSS(path: string, color: string, theme: 'light' | 'dark'): string {
 		const selector = theme === 'dark' ? `.theme-dark .nav-folder-title[data-path="${path}"]` : `.nav-folder-title[data-path="${path}"]`;
 		const opacities = theme === 'dark' ? [0.15, 0.2, 0.25, 0.3] : [0.1, 0.15, 0.2, 0.25];
@@ -214,7 +222,12 @@ ${selector}:hover {
 ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 	}
 
-	/** Converts HSL to HSLA with opacity */
+	/**
+	 * Converts HSL color to HSLA with specified opacity.
+	 * @param hslColor - HSL color string (e.g., 'hsl(240, 100%, 50%)')
+	 * @param opacity - Opacity value between 0 and 1
+	 * @returns HSLA color string
+	 */
 	private adjustColorOpacity(hslColor: string, opacity: number): string {
 		return hslColor.replace('hsl(', 'hsla(').replace(')', `, ${opacity})`);
 	}
@@ -223,7 +236,10 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 	// CORE CREATION LOGIC
 	// =================================================================================
 
-	/** Handles the main command - creates new root MOC or adds content to existing MOC */
+	/**
+	 * Context-aware creation handler - creates root MOC or adds content to existing MOC.
+	 * Determines action based on whether active file is a MOC or not.
+	 */
 	async handleContextCreate() {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile || !this.isMOC(activeFile)) {
@@ -233,7 +249,11 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		}
 	}
 
-	/** Creates a new root MOC */
+	/**
+	 * Creates a new root MOC with complete folder structure and random styling.
+	 * @param name - Name for the MOC (will be prefixed with random emoji)
+	 * @returns Promise resolving to the created MOC file
+	 */
 	async createMOC(name: string): Promise<TFile> {
 		const emoji = this.getRandomEmoji();
 		const colorInfo = this.generateRandomColor();
@@ -254,7 +274,12 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		return file;
 	}
 
-	/** Creates a new sub-MOC */
+	/**
+	 * Creates a sub-MOC within an existing MOC's folder structure.
+	 * @param parentMOC - Parent MOC file to create sub-MOC under
+	 * @param name - Name for the sub-MOC
+	 * @returns Promise resolving to the created sub-MOC file
+	 */
 	async createSubMOC(parentMOC: TFile, name: string): Promise<TFile> {
 		const emoji = this.getRandomEmoji();
 		const colorInfo = this.generateRandomColor();
@@ -276,7 +301,11 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		return file;
 	}
 
-	/** Unified file creation method */
+	/**
+	 * Unified factory method for creating different file types with consistent patterns.
+	 * @param config - Configuration object specifying name, type, parent MOC, and description
+	 * @returns Promise resolving to the created file
+	 */
 	async createFile(config: CreateConfig): Promise<TFile> {
 		const fileConfigs: Record<NoteType, FileConfig> = {
 			moc: { type: 'moc', emoji: this.getRandomEmoji(), folder: '', suffix: 'MOC', createSubfolder: true },
@@ -302,7 +331,6 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		return file;
 	}
 
-	/** Create note and resource using unified method */
 	async createNote(parentMOC: TFile, name: string): Promise<TFile> {
 		return this.createFile({ name, parentMOC, type: 'note' });
 	}
@@ -311,12 +339,17 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		return this.createFile({ name, parentMOC, type: 'resource' });
 	}
 
-	/** Create prompt using unified method */
 	async createPrompt(parentMOC: TFile, name: string): Promise<TFile> {
 		return this.createFile({ name, parentMOC, type: 'prompt' });
 	}
 
-	/** Helper method for prompt creation with iterations */
+	/**
+	 * Creates prompt hub and first iteration with hierarchical folder structure.
+	 * @param config - Creation configuration
+	 * @param hubFileName - File path for the prompt hub
+	 * @param content - Base content for files
+	 * @returns Promise resolving to the created hub file
+	 */
 	private async createPromptWithIterations(config: CreateConfig, hubFileName: string, content: string): Promise<TFile> {
 		const parentPath = config.parentMOC?.parent?.path || '';
 		const promptsFolder = `${parentPath}/${CONFIG.FOLDERS.Prompts}`;
@@ -343,13 +376,24 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		return hubFile;
 	}
 
-	/** Helper methods for unified file creation */
+	/**
+	 * Builds complete file path with emoji prefix, name, and optional suffix.
+	 * @param name - Base name for the file
+	 * @param config - File configuration with emoji and folder information
+	 * @param parentPath - Parent directory path
+	 * @returns Complete normalized file path
+	 */
 	private buildFileName(name: string, config: FileConfig, parentPath: string): string {
 		const suffix = config.suffix ? ` ${config.suffix}` : '';
 		const folder = config.folder ? `/${config.folder}` : '';
 		return normalizePath(`${parentPath}${folder}/${config.emoji} ${name}${suffix}.md`);
 	}
 
+	/**
+	 * Generates YAML frontmatter string from data object.
+	 * @param data - Key-value pairs for frontmatter
+	 * @returns Formatted YAML frontmatter with surrounding delimiters
+	 */
 	private buildFrontmatter(data: Record<string, any>): string {
 		const lines = ['---'];
 		for (const [key, value] of Object.entries(data)) {
@@ -363,6 +407,11 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		return lines.join('\n');
 	}
 
+	/**
+	 * Converts color information to frontmatter properties.
+	 * @param color - Color information object with HSL values and theme variants
+	 * @returns Object with color properties for frontmatter
+	 */
 	private colorToFrontmatter(color: ColorInfo): Record<string, any> {
 		return {
 			'moc-hue': color.hue,
@@ -373,6 +422,11 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		};
 	}
 
+	/**
+	 * Maps file types to their corresponding MOC section names.
+	 * @param type - File type (moc, note, resource, prompt)
+	 * @returns Section name for organizing content in MOCs
+	 */
 	private typeToSection(type: NoteType): SectionType {
 		const mapping: Record<NoteType, SectionType> = {
 			moc: 'MOCs', note: 'Notes', resource: 'Resources', prompt: 'Prompts'
@@ -389,7 +443,10 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		new Notice(message);
 	}
 
-	/** Ensures the full folder structure for a given MOC exists */
+	/**
+	 * Creates complete folder hierarchy for a MOC (Notes, Resources, Prompts subfolders).
+	 * @param mocFolderPath - Path where MOC folder should be created
+	 */
 	async ensureMOCFolderStructure(mocFolderPath: string) {
 		if (!this.app.vault.getAbstractFileByPath(mocFolderPath)) {
 			await this.app.vault.createFolder(mocFolderPath);
@@ -557,7 +614,10 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 	// PROMPT MANAGEMENT SYSTEM
 	// =================================================================================
 
-	/** Duplicates a prompt iteration, incrementing the version number */
+	/**
+	 * Creates a new versioned iteration of an existing prompt.
+	 * @param file - The prompt iteration file to duplicate
+	 */
 	async duplicatePromptIteration(file: TFile) {
 		const match = file.basename.match(/^(?:🤖\s+)?(.+?)\s*v(\d+)/);
 		if (!match || !file.parent) return;
@@ -587,7 +647,12 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		}).open();
 	}
 	
-	/** Adds a link to a new prompt iteration to its corresponding hub file */
+	/**
+	 * Updates the prompt hub with a link to the new iteration.
+	 * @param baseName - Base name of the prompt (without version)
+	 * @param newIteration - The newly created iteration file
+	 * @param promptSubfolderPath - Path to the prompt's subfolder
+	 */
 	async updatePromptHub(baseName: string, newIteration: TFile, promptSubfolderPath: string) {
 		const promptsFolder = promptSubfolderPath.substring(0, promptSubfolderPath.lastIndexOf('/'));
 		const hubPath = `${promptsFolder}/${CONFIG.NOTE_TYPES.Prompts.emoji} ${baseName}.md`;
@@ -609,7 +674,10 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		}
 	}
 
-	/** Opens all URLs found in an llm-links code block */
+	/**
+	 * Opens all URLs from the llm-links code block in the prompt hub.
+	 * @param file - Prompt hub file containing llm-links block
+	 */
 	async openLLMLinks(file: TFile) {
 		const content = await this.app.vault.read(file);
 		const linkBlockMatch = content.match(/```llm-links\n([\s\S]*?)\n```/);
@@ -637,12 +705,20 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 	// MOC REORGANIZATION SYSTEM
 	// =================================================================================
 
-	/** Initiates the MOC reorganization process */
+	/**
+	 * Opens modal for reorganizing MOC hierarchy (promote, demote, move).
+	 * @param moc - The MOC file to reorganize
+	 */
 	async reorganizeMOC(moc: TFile) {
 		new ReorganizeMOCModal(this.app, moc, this).open();
 	}
 
-	/** Converts a root MOC into a sub-MOC */
+	/**
+	 * Moves a root MOC to become a sub-MOC under a parent.
+	 * @param moc - Root MOC to move
+	 * @param parentMOCName - Name for new parent MOC (if creating new)
+	 * @param existingParent - Existing parent MOC (if using existing)
+	 */
 	async moveRootMOCToSub(moc: TFile, parentMOCName: string | null, existingParent: TFile | null) {
 		try {
 			const parentMOC = existingParent || (parentMOCName ? await this.createMOC(parentMOCName) : null);
@@ -666,7 +742,10 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		}
 	}
 
-	/** Promotes a sub-MOC to a root MOC */
+	/**
+	 * Promotes a sub-MOC to become a root MOC.
+	 * @param moc - Sub-MOC to promote
+	 */
 	async promoteSubMOCToRoot(moc: TFile) {
 		try {
 			const mocFolder = moc.parent;
@@ -685,7 +764,11 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		}
 	}
 
-	/** Moves a sub-MOC to a new parent */
+	/**
+	 * Moves a sub-MOC from one parent to another.
+	 * @param moc - Sub-MOC to move
+	 * @param newParent - New parent MOC
+	 */
 	async moveSubMOCToNewParent(moc: TFile, newParent: TFile) {
 		try {
 			const mocFolder = moc.parent;
@@ -707,7 +790,10 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		}
 	}
 
-	/** Removes links to a given MOC from all parent MOCs */
+	/**
+	 * Removes all references to a MOC from parent MOCs during reorganization.
+	 * @param moc - MOC whose links should be removed
+	 */
 	async removeFromParentMOCs(moc: TFile) {
 		const allMOCs = await this.getAllMOCs();
 		const linkPattern = new RegExp(`^-\\s*\\[\\[${moc.basename}\\]\\]\\s*$`);
@@ -728,7 +814,9 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 	// VAULT UPDATE & MAINTENANCE
 	// =================================================================================
 
-	/** Initiates the process to update the entire vault */
+	/**
+	 * Analyzes vault and presents update plan for modernizing to current system.
+	 */
 	async updateVaultToLatestSystem() {
 		new Notice('Analyzing vault for updates...');
 		
@@ -744,7 +832,10 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		}
 	}
 
-	/** Scans the vault to find all files that need updating */
+	/**
+	 * Scans all markdown files to identify those needing system updates.
+	 * @returns Update plan with files to modify and required changes
+	 */
 	async analyzeVaultForUpdates(): Promise<VaultUpdatePlan> {
 		const allFiles = this.app.vault.getMarkdownFiles();
 		const filesToUpdate: TFile[] = [];
@@ -765,7 +856,11 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		};
 	}
 	
-	/** Detects what updates a file needs */
+	/**
+	 * Analyzes a single file to determine what updates it needs.
+	 * @param file - File to analyze
+	 * @returns Array of update descriptions needed for the file
+	 */
 	async detectRequiredUpdates(file: TFile): Promise<string[]> {
 		const updates: string[] = [];
 		const cache = this.app.metadataCache.getFileCache(file);
@@ -816,7 +911,11 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		return updates;
 	}
 
-	/** Executes the update plan */
+	/**
+	 * Applies all updates from the vault update plan.
+	 * @param plan - Update plan containing files and required changes
+	 * @returns Array of results indicating success/failure for each file
+	 */
 	async executeUpdatePlan(plan: VaultUpdatePlan): Promise<UpdateResult[]> {
 		new Notice(`Updating ${plan.filesToUpdate.length} files...`);
 		
@@ -1049,26 +1148,44 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 	// UTILITY METHODS
 	// =================================================================================
 
-	/** File type checking methods */
+	/**
+	 * Determines if a file is a MOC based on frontmatter tags.
+	 * @param file - File to check
+	 * @returns True if file has 'moc' tag in frontmatter
+	 */
 	isMOC(file: TFile): boolean {
 		return this.app.metadataCache.getFileCache(file)?.frontmatter?.tags?.includes('moc') ?? false;
 	}
 	
+	/**
+	 * Determines if a MOC is at the root level (not nested under another MOC).
+	 * @param file - MOC file to check
+	 * @returns True if MOC is at vault root level
+	 */
 	isRootMOC(file: TFile): boolean {
 		return this.isMOC(file) && !(file.parent?.path || '').includes('/');
 	}
 
+	/**
+	 * Determines if a file is a versioned prompt iteration.
+	 * @param file - File to check
+	 * @returns True if file is a prompt with version number in name
+	 */
 	isPromptIteration(file: TFile): boolean {
 		const noteType = this.app.metadataCache.getFileCache(file)?.frontmatter?.['note-type'];
 		return noteType === 'prompt' && /v\d+/.test(file.basename);
 	}
 
+	/**
+	 * Determines if a file is a prompt hub (manages iterations).
+	 * @param file - File to check
+	 * @returns True if file is a prompt without version number
+	 */
 	isPromptHub(file: TFile): boolean {
 		const noteType = this.app.metadataCache.getFileCache(file)?.frontmatter?.['note-type'];
 		return noteType === 'prompt' && !this.isPromptIteration(file);
 	}
 
-	/** Helper methods for file analysis */
 	private hasEmojiPrefix(basename: string): boolean {
 		return /^[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(basename);
 	}
@@ -1082,11 +1199,14 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		new Notice(`${message}: ${error.message}`);
 	}
 
+	/**
+	 * Retrieves all MOC files in the vault.
+	 * @returns Promise resolving to array of MOC files
+	 */
 	async getAllMOCs(): Promise<TFile[]> {
 		return this.app.vault.getMarkdownFiles().filter(f => this.isMOC(f));
 	}
 
-	/** Migration and detection helper methods */
 	private needsFolderMigration(file: TFile): boolean {
 		return this.isMOC(file) && this.isRootMOC(file) && (file.parent?.isRoot() ?? false);
 	}
@@ -1111,7 +1231,12 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 		return null;
 	}
 
-	/** Detects circular dependencies in MOC hierarchy */
+	/**
+	 * Prevents circular dependencies when reorganizing MOC hierarchy.
+	 * @param moc - MOC that would become a child
+	 * @param potentialParent - MOC that would become the parent
+	 * @returns True if this would create a circular dependency
+	 */
 	detectCircularDependency(moc: TFile, potentialParent: TFile): boolean {
 		const visited = new Set<string>();
 		const queue: TFile[] = [moc];
@@ -1136,14 +1261,20 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 	// RANDOM GENERATION UTILITIES
 	// =================================================================================
 
-	/** Generates random emoji for MOC identification */
+	/**
+	 * Generates a random emoji from predefined Unicode ranges for MOC identification.
+	 * @returns Random emoji string
+	 */
 	private getRandomEmoji(): string {
 		const range = CONFIG.EMOJI_RANGES[Math.floor(Math.random() * CONFIG.EMOJI_RANGES.length)];
 		const codePoint = Math.floor(Math.random() * (range[1] - range[0] + 1)) + range[0];
 		return String.fromCodePoint(codePoint);
 	}
 
-	/** Generates random color for MOC folders */
+	/**
+	 * Generates random HSL color information for MOC folder styling.
+	 * @returns Color object with HSL values and theme variants
+	 */
 	private generateRandomColor(): ColorInfo {
 		const hue = Math.floor(Math.random() * 360);
 		const saturation = CONFIG.COLOR.SATURATION_RANGE[0] + 
@@ -1163,7 +1294,10 @@ ${selector} .nav-folder-collapse-indicator { color: ${color} !important; }`;
 // MODAL DIALOGS
 // =================================================================================
 
-/** Base modal class with common functionality */
+/**
+ * Base modal class providing common functionality for all plugin modals.
+ * Includes standardized button creation, input handling, and keyboard shortcuts.
+ */
 abstract class BaseModal extends Modal {
 	protected createButtons(buttons: Array<{text: string, action: () => void, primary?: boolean}>) {
 		const container = this.contentEl.createDiv({ cls: 'moc-system-modal-buttons' });
@@ -1200,7 +1334,9 @@ abstract class BaseModal extends Modal {
 	onClose() { this.contentEl.empty(); }
 }
 
-/** Modal for vault updates */
+/**
+ * Modal for displaying and confirming vault update operations.
+ */
 class VaultUpdateModal extends BaseModal {
 	constructor(app: App, private updatePlan: VaultUpdatePlan, private onConfirm: () => void) {
 		super(app);
