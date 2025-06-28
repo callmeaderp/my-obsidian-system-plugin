@@ -1006,15 +1006,200 @@ ${selector} .nav-folder-collapse-indicator {
 	// =================================================================================
 
 	async duplicatePromptIteration(file: TFile) {
-		// Implementation would go here - shortened for space
-		new PromptDescriptionModal(this.app, async (description: string) => {
-			// Prompt duplication logic
-		}).open();
+		try {
+			// Extract current version number from file basename
+			const currentVersion = extractPromptVersion(file.basename);
+			if (!currentVersion) {
+				new Notice('Could not determine version number from file name.');
+				return;
+			}
+
+			// Find the hub file and iteration folder structure
+			const iterationFolder = file.parent;
+			const promptsFolder = iterationFolder?.parent;
+			const mocFolder = promptsFolder?.parent;
+			
+			if (!iterationFolder || !promptsFolder || !mocFolder) {
+				new Notice('Could not find prompt structure. File must be in a prompt iteration folder.');
+				return;
+			}
+
+			// Find the hub file (should be in the Prompts folder)
+			const hubFile = promptsFolder.children?.find(child => 
+				child instanceof TFile && 
+				child.name.startsWith(CONFIG.NOTE_TYPES.Prompts.emoji) &&
+				child.name.endsWith('.md') &&
+				!child.path.includes('/')
+			) as TFile;
+
+			if (!hubFile) {
+				new Notice('Could not find prompt hub file.');
+				return;
+			}
+
+			new PromptDescriptionModal(this.app, async (description: string) => {
+				try {
+					const nextVersion = currentVersion + 1;
+					const baseIterationName = file.basename.replace(/ v\d+$/, '');
+					
+					// Build new iteration filename with optional description
+					let newIterationName = `${baseIterationName} v${nextVersion}`;
+					if (description.trim()) {
+						const sanitizedDescription = sanitizeInput(description, 'iteration description');
+						newIterationName += ` - ${sanitizedDescription}`;
+					}
+					
+					// Read current iteration content
+					const currentContent = await this.app.vault.read(file);
+					
+					// Create new iteration file in the same folder
+					const newIterationPath = `${iterationFolder.path}/${newIterationName}.md`;
+					const newFile = await this.createFileWithContent(newIterationPath, currentContent);
+					
+					// Update hub file to include new iteration
+					await this.addIterationToHub(hubFile, newFile);
+					
+					// Open the new iteration file
+					await this.app.workspace.getLeaf().openFile(newFile);
+					new Notice(`Created iteration v${nextVersion}${description ? ` - ${description}` : ''}`);
+					
+				} catch (error) {
+					this.handleError('Failed to duplicate prompt iteration', error);
+				}
+			}).open();
+			
+		} catch (error) {
+			this.handleError('Failed to prepare prompt iteration duplication', error);
+		}
+	}
+
+	/**
+	 * Adds a new iteration link to the prompt hub file
+	 * 
+	 * Why: Keeps the hub file synchronized with all available iterations.
+	 * Maintains the organized list structure for easy navigation.
+	 */
+	private async addIterationToHub(hubFile: TFile, newIterationFile: TFile) {
+		try {
+			let content = await this.app.vault.read(hubFile);
+			let lines = content.split('\n');
+			
+			// Find the Iterations section
+			const iterationsIndex = lines.findIndex(line => line.trim() === '## Iterations');
+			if (iterationsIndex === -1) {
+				// If no Iterations section exists, create it after frontmatter
+				const frontmatterEnd = this.findFrontmatterEnd(lines);
+				const titleIndex = lines.findIndex((line, i) => i >= frontmatterEnd && line.startsWith('# '));
+				const insertIndex = titleIndex !== -1 ? titleIndex + 1 : frontmatterEnd;
+				
+				lines.splice(insertIndex, 0, '', '## Iterations', '', `- [[${newIterationFile.basename}]]`, '');
+			} else {
+				// Find where to insert the new iteration (after the section header)
+				let insertIndex = iterationsIndex + 1;
+				
+				// Skip empty lines after section header
+				while (insertIndex < lines.length && lines[insertIndex].trim() === '') {
+					insertIndex++;
+				}
+				
+				// Insert the new iteration link
+				lines.splice(insertIndex, 0, `- [[${newIterationFile.basename}]]`);
+			}
+			
+			await this.app.vault.modify(hubFile, lines.join('\n'));
+		} catch (error) {
+			throw this.wrapError(error, 'Failed to update hub file with new iteration', 'update', hubFile.path);
+		}
 	}
 
 	async openLLMLinks(file: TFile) {
-		// LLM links opening logic - shortened for space
-		new Notice('LLM links functionality');
+		try {
+			// Read the hub file content
+			const content = await this.app.vault.read(file);
+			const lines = content.split('\n');
+			
+			// Find the LLM Links section
+			const llmLinksIndex = lines.findIndex(line => line.trim() === '## LLM Links');
+			if (llmLinksIndex === -1) {
+				new Notice('No LLM Links section found in this prompt hub.');
+				return;
+			}
+			
+			// Find the llm-links code block
+			let codeBlockStart = -1;
+			let codeBlockEnd = -1;
+			
+			for (let i = llmLinksIndex + 1; i < lines.length; i++) {
+				const line = lines[i].trim();
+				
+				if (line === '```llm-links' || line === '```llm-links' || line.startsWith('```llm-links')) {
+					codeBlockStart = i + 1;
+				} else if (codeBlockStart !== -1 && line === '```') {
+					codeBlockEnd = i;
+					break;
+				} else if (line.startsWith('## ') && codeBlockStart === -1) {
+					// Hit another section without finding code block
+					break;
+				}
+			}
+			
+			if (codeBlockStart === -1) {
+				new Notice('No llm-links code block found. Add URLs in a ```llm-links code block.');
+				return;
+			}
+			
+			// Extract URLs from the code block
+			const urlLines = lines.slice(codeBlockStart, codeBlockEnd === -1 ? lines.length : codeBlockEnd);
+			const urls = urlLines
+				.map(line => line.trim())
+				.filter(line => line.length > 0)
+				.filter(line => this.isValidUrl(line));
+			
+			if (urls.length === 0) {
+				new Notice('No valid URLs found in LLM Links section.');
+				return;
+			}
+			
+			// Open each URL in the default browser
+			const { shell } = window.require('electron');
+			let openedCount = 0;
+			
+			for (const url of urls) {
+				try {
+					await shell.openExternal(url);
+					openedCount++;
+					// Small delay between opens to prevent overwhelming the system
+					await delay(200);
+				} catch (error) {
+					console.warn(`Failed to open URL: ${url}`, error);
+				}
+			}
+			
+			const message = openedCount === urls.length 
+				? `Opened ${openedCount} LLM conversation${openedCount === 1 ? '' : 's'}`
+				: `Opened ${openedCount} of ${urls.length} LLM conversations (some failed)`;
+			
+			new Notice(message);
+			
+		} catch (error) {
+			this.handleError('Failed to open LLM links', error);
+		}
+	}
+
+	/**
+	 * Validates if a string is a properly formatted URL
+	 * 
+	 * Why: Prevents attempting to open invalid URLs which could cause errors
+	 * or unexpected behavior in the browser.
+	 */
+	private isValidUrl(urlString: string): boolean {
+		try {
+			const url = new URL(urlString);
+			// Only allow http and https protocols for security
+			return url.protocol === 'http:' || url.protocol === 'https:';
+		} catch {
+			return false;
+		}
 	}
 
 	// =================================================================================
@@ -1121,11 +1306,449 @@ ${selector} .nav-folder-collapse-indicator {
 	async updateVaultToLatestSystem() {
 		try {
 			new Notice('Analyzing vault for updates...');
-			// Analysis and update logic would go here
-			new Notice('Update functionality available');
+			
+			// Generate update plan by analyzing all plugin files
+			const updatePlan = await this.generateVaultUpdatePlan();
+			
+			if (updatePlan.totalChanges === 0) {
+				new Notice('Vault is already up to date! No changes needed.');
+				return;
+			}
+			
+			// Show update plan to user for confirmation
+			new VaultUpdateModal(this.app, updatePlan, async () => {
+				await this.executeVaultUpdates(updatePlan);
+			}).open();
+			
 		} catch (error) {
 			this.handleError('Error during vault update analysis', error);
 		}
+	}
+
+	/**
+	 * Analyzes all plugin files and generates a comprehensive update plan
+	 * 
+	 * Why: Identifies outdated patterns and missing features across the vault
+	 * to bring all files up to current system standards.
+	 */
+	private async generateVaultUpdatePlan(): Promise<VaultUpdatePlan> {
+		const allFiles = this.app.vault.getMarkdownFiles();
+		const filesToUpdate: TFile[] = [];
+		const updateSummary = new Map<TFile, string[]>();
+		let totalChanges = 0;
+
+		for (const file of allFiles) {
+			// Only analyze plugin-created files
+			if (!this.isPluginCreatedFile(file)) continue;
+
+			const updates = await this.analyzeFileForUpdates(file);
+			if (updates.length > 0) {
+				filesToUpdate.push(file);
+				updateSummary.set(file, updates);
+				totalChanges += updates.length;
+			}
+		}
+
+		return { filesToUpdate, updateSummary, totalChanges };
+	}
+
+	/**
+	 * Analyzes a single file for potential updates
+	 * 
+	 * Why: Comprehensive per-file analysis ensures all aspects of the current
+	 * system standards are checked and brought up to date.
+	 */
+	private async analyzeFileForUpdates(file: TFile): Promise<string[]> {
+		const updates: string[] = [];
+		const cache = this.app.metadataCache.getFileCache(file);
+		const frontmatter = cache?.frontmatter;
+		const noteType = getFrontmatterValue(frontmatter, 'note-type', null as string | null);
+
+		// Analyze frontmatter completeness
+		if (!frontmatter) {
+			updates.push('Add missing frontmatter section');
+		} else {
+			if (!noteType) {
+				updates.push('Add missing note-type field');
+			}
+
+			// MOC-specific checks
+			if (noteType === 'moc' || this.isMOC(file)) {
+				const tags = getFrontmatterValue(frontmatter, 'tags', [] as string[]);
+				if (!Array.isArray(tags) || !tags.includes('moc')) {
+					updates.push('Add missing "moc" tag');
+				}
+
+				// Check for color information in root MOCs
+				if (this.isRootMOC(file)) {
+					const lightColor = getFrontmatterValue(frontmatter, 'light-color', null);
+					const darkColor = getFrontmatterValue(frontmatter, 'dark-color', null);
+					if (!lightColor || !darkColor) {
+						updates.push('Add missing MOC color information');
+					}
+				}
+			}
+		}
+
+		// Analyze file structure and content
+		if (noteType === 'moc') {
+			const structureUpdates = await this.analyzeMOCStructure(file);
+			updates.push(...structureUpdates);
+		} else if (noteType === 'prompt' && this.isPromptHub(file)) {
+			const promptUpdates = await this.analyzePromptHubStructure(file);
+			updates.push(...promptUpdates);
+		}
+
+		// Check naming conventions
+		const namingUpdates = this.analyzeNamingConventions(file, noteType);
+		updates.push(...namingUpdates);
+
+		return updates;
+	}
+
+	/**
+	 * Analyzes MOC file structure for compliance with current standards
+	 */
+	private async analyzeMOCStructure(file: TFile): Promise<string[]> {
+		const updates: string[] = [];
+		
+		try {
+			const content = await this.app.vault.read(file);
+			const lines = content.split('\n');
+			const frontmatterEnd = this.findFrontmatterEnd(lines);
+
+			// Check for proper section organization
+			const sectionIndices = new Map<SectionType, number>();
+			let hasAnySection = false;
+
+			for (const section of CONFIG.SECTION_ORDER) {
+				const index = lines.findIndex((line, i) => 
+					i >= frontmatterEnd && line.trim() === `## ${section}`
+				);
+				if (index !== -1) {
+					sectionIndices.set(section, index);
+					hasAnySection = true;
+				}
+			}
+
+			// Check section order
+			const foundSections = Array.from(sectionIndices.entries()).sort(([,a], [,b]) => a - b);
+			const expectedOrder = CONFIG.SECTION_ORDER.filter(section => sectionIndices.has(section));
+			
+			if (foundSections.map(([section]) => section).join(',') !== expectedOrder.join(',')) {
+				updates.push('Reorganize sections to standard order (MOCs, Notes, Resources, Prompts)');
+			}
+
+			// For MOCs with content, ensure they have at least basic structure
+			if (hasAnySection) {
+				const hasTitle = lines.some((line, i) => i >= frontmatterEnd && line.startsWith('# '));
+				if (!hasTitle) {
+					updates.push('Add missing title header');
+				}
+			}
+
+		} catch (error) {
+			console.warn(`Failed to analyze MOC structure for ${file.path}:`, error);
+		}
+
+		return updates;
+	}
+
+	/**
+	 * Analyzes prompt hub structure for compliance with current standards
+	 */
+	private async analyzePromptHubStructure(file: TFile): Promise<string[]> {
+		const updates: string[] = [];
+		
+		try {
+			const content = await this.app.vault.read(file);
+			const lines = content.split('\n');
+
+			const hasIterationsSection = lines.some(line => line.trim() === '## Iterations');
+			const hasLLMLinksSection = lines.some(line => line.trim() === '## LLM Links');
+
+			if (!hasIterationsSection) {
+				updates.push('Add missing Iterations section');
+			}
+
+			if (!hasLLMLinksSection) {
+				updates.push('Add missing LLM Links section with code block');
+			}
+
+		} catch (error) {
+			console.warn(`Failed to analyze prompt hub structure for ${file.path}:`, error);
+		}
+
+		return updates;
+	}
+
+	/**
+	 * Analyzes file naming conventions
+	 */
+	private analyzeNamingConventions(file: TFile, noteType: string | null): string[] {
+		const updates: string[] = [];
+
+		// Check emoji prefixes
+		if (!hasEmojiPrefix(file.name)) {
+			if (noteType && ['moc', 'note', 'resource', 'prompt'].includes(noteType)) {
+				updates.push('Add missing emoji prefix');
+			}
+		}
+
+		// Check MOC suffix
+		if (noteType === 'moc' && !file.basename.endsWith(' MOC')) {
+			updates.push('Add missing " MOC" suffix');
+		}
+
+		return updates;
+	}
+
+	/**
+	 * Executes the planned vault updates
+	 * 
+	 * Why: Applies all planned changes systematically with proper error handling
+	 * and progress feedback.
+	 */
+	private async executeVaultUpdates(updatePlan: VaultUpdatePlan): Promise<void> {
+		try {
+			new Notice('Starting vault updates...');
+			let updatedCount = 0;
+			const results: UpdateResult[] = [];
+
+			for (const file of updatePlan.filesToUpdate) {
+				const plannedChanges = updatePlan.updateSummary.get(file) || [];
+				
+				try {
+					await this.executeFileUpdates(file, plannedChanges);
+					updatedCount++;
+					
+					results.push({
+						file,
+						changes: plannedChanges,
+						success: true
+					});
+					
+				} catch (error) {
+					console.error(`Failed to update ${file.path}:`, error);
+					results.push({
+						file,
+						changes: plannedChanges,
+						success: false,
+						error: error instanceof Error ? error.message : String(error)
+					});
+				}
+			}
+
+			// Update styles after all changes
+			await this.updateMOCStyles();
+
+			// Show completion summary
+			const failedCount = results.filter(r => !r.success).length;
+			if (failedCount === 0) {
+				new Notice(`✅ Vault update complete! Updated ${updatedCount} files.`);
+			} else {
+				new Notice(`⚠️ Vault update completed with ${failedCount} errors. Updated ${updatedCount - failedCount} of ${updatedCount} files.`);
+			}
+
+		} catch (error) {
+			this.handleError('Failed to execute vault updates', error);
+		}
+	}
+
+	/**
+	 * Executes updates for a single file
+	 */
+	private async executeFileUpdates(file: TFile, plannedChanges: string[]): Promise<void> {
+		for (const change of plannedChanges) {
+			switch (change) {
+				case 'Add missing frontmatter section':
+					await this.addMissingFrontmatter(file);
+					break;
+				case 'Add missing note-type field':
+					await this.addNoteTypeField(file);
+					break;
+				case 'Add missing "moc" tag':
+					await this.addMOCTag(file);
+					break;
+				case 'Add missing MOC color information':
+					await this.addMOCColorInfo(file);
+					break;
+				case 'Add missing emoji prefix':
+					await this.addEmojiPrefix(file);
+					break;
+				case 'Add missing " MOC" suffix':
+					await this.addMOCSuffix(file);
+					break;
+				case 'Add missing Iterations section':
+					await this.addIterationsSection(file);
+					break;
+				case 'Add missing LLM Links section with code block':
+					await this.addLLMLinksSection(file);
+					break;
+				case 'Reorganize sections to standard order (MOCs, Notes, Resources, Prompts)':
+					await this.reorganizeMOCSections(file);
+					break;
+				case 'Add missing title header':
+					await this.addTitleHeader(file);
+					break;
+				default:
+					console.warn(`Unknown update: ${change} for file ${file.path}`);
+			}
+		}
+	}
+
+	// Individual update methods for specific changes
+	private async addMissingFrontmatter(file: TFile): Promise<void> {
+		const content = await this.app.vault.read(file);
+		if (!content.startsWith('---')) {
+			const noteType = this.detectNoteType(file);
+			const frontmatter = this.buildFrontmatter({ 'note-type': noteType });
+			await this.app.vault.modify(file, frontmatter + content);
+		}
+	}
+
+	private async addNoteTypeField(file: TFile): Promise<void> {
+		const noteType = this.detectNoteType(file);
+		await this.app.vault.process(file, (content) => {
+			const lines = content.split('\n');
+			if (lines[0] === '---') {
+				const closingIndex = lines.slice(1).indexOf('---');
+				if (closingIndex !== -1) {
+					lines.splice(closingIndex + 1, 0, `note-type: ${noteType}`);
+				}
+			}
+			return lines.join('\n');
+		});
+	}
+
+	private async addMOCTag(file: TFile): Promise<void> {
+		await this.app.vault.process(file, (content) => {
+			const lines = content.split('\n');
+			if (lines[0] === '---') {
+				const closingIndex = lines.slice(1).indexOf('---');
+				if (closingIndex !== -1) {
+					// Look for existing tags line
+					const tagsIndex = lines.findIndex((line, i) => 
+						i > 0 && i < closingIndex + 1 && line.startsWith('tags:')
+					);
+					
+					if (tagsIndex !== -1) {
+						// Update existing tags
+						if (lines[tagsIndex].includes('[') && lines[tagsIndex].includes(']')) {
+							lines[tagsIndex] = lines[tagsIndex].replace(']', ', moc]');
+						} else {
+							lines[tagsIndex] = 'tags: [moc]';
+						}
+					} else {
+						// Add tags line
+						lines.splice(closingIndex + 1, 0, 'tags: [moc]');
+					}
+				}
+			}
+			return lines.join('\n');
+		});
+	}
+
+	private async addMOCColorInfo(file: TFile): Promise<void> {
+		const colorInfo = generateRandomColor();
+		const colorFrontmatter = this.colorToFrontmatter(colorInfo);
+		
+		await this.app.vault.process(file, (content) => {
+			const lines = content.split('\n');
+			if (lines[0] === '---') {
+				const closingIndex = lines.slice(1).indexOf('---');
+				if (closingIndex !== -1) {
+					// Add color fields
+					Object.entries(colorFrontmatter).forEach(([key, value]) => {
+						lines.splice(closingIndex + 1, 0, `${key}: ${value}`);
+					});
+				}
+			}
+			return lines.join('\n');
+		});
+	}
+
+	private async addEmojiPrefix(file: TFile): Promise<void> {
+		const noteType = this.detectNoteType(file);
+		let emoji = getRandomEmoji();
+		
+		// Use standard emojis for known types
+		if (noteType === 'note') emoji = CONFIG.NOTE_TYPES.Notes.emoji;
+		else if (noteType === 'resource') emoji = CONFIG.NOTE_TYPES.Resources.emoji;
+		else if (noteType === 'prompt') emoji = CONFIG.NOTE_TYPES.Prompts.emoji;
+		
+		const newName = `${emoji} ${file.name}`;
+		await this.app.vault.rename(file, `${file.parent?.path || ''}/${newName}`);
+	}
+
+	private async addMOCSuffix(file: TFile): Promise<void> {
+		const newName = file.name.replace('.md', ' MOC.md');
+		await this.app.vault.rename(file, `${file.parent?.path || ''}/${newName}`);
+	}
+
+	private async addIterationsSection(file: TFile): Promise<void> {
+		await this.app.vault.process(file, (content) => {
+			const lines = content.split('\n');
+			const frontmatterEnd = this.findFrontmatterEnd(lines);
+			
+			// Add after title or frontmatter
+			const titleIndex = lines.findIndex((line, i) => i >= frontmatterEnd && line.startsWith('# '));
+			const insertIndex = titleIndex !== -1 ? titleIndex + 1 : frontmatterEnd;
+			
+			lines.splice(insertIndex, 0, '', '## Iterations', '');
+			return lines.join('\n');
+		});
+	}
+
+	private async addLLMLinksSection(file: TFile): Promise<void> {
+		await this.app.vault.process(file, (content) => {
+			const lines = content.split('\n');
+			const sectionContent = ['', '## LLM Links', '', '```llm-links', '', '```', ''];
+			lines.push(...sectionContent);
+			return lines.join('\n');
+		});
+	}
+
+	private async reorganizeMOCSections(file: TFile): Promise<void> {
+		await this.app.vault.process(file, (content) => {
+			const lines = content.split('\n');
+			const frontmatterEnd = this.findFrontmatterEnd(lines);
+			const { reorganizedLines } = this.reorganizeContentForPluginSections(lines, frontmatterEnd);
+			return reorganizedLines.join('\n');
+		});
+	}
+
+	private async addTitleHeader(file: TFile): Promise<void> {
+		await this.app.vault.process(file, (content) => {
+			const lines = content.split('\n');
+			const frontmatterEnd = this.findFrontmatterEnd(lines);
+			const title = file.basename.replace(' MOC', '').replace(/^[🔥-🦉]\s+/, ''); // Remove emoji and MOC suffix
+			lines.splice(frontmatterEnd, 0, `# ${title}`, '');
+			return lines.join('\n');
+		});
+	}
+
+	/**
+	 * Detects the note type based on file location and characteristics
+	 */
+	private detectNoteType(file: TFile): string {
+		// Check if it's a MOC by existing logic
+		if (this.isMOC(file)) return 'moc';
+		
+		// Check by folder location
+		const path = file.path;
+		if (path.includes('/Notes/')) return 'note';
+		if (path.includes('/Resources/')) return 'resource';
+		if (path.includes('/Prompts/')) return 'prompt';
+		
+		// Check by file characteristics
+		if (file.basename.endsWith(' MOC')) return 'moc';
+		if (file.name.startsWith(CONFIG.NOTE_TYPES.Notes.emoji)) return 'note';
+		if (file.name.startsWith(CONFIG.NOTE_TYPES.Resources.emoji)) return 'resource';
+		if (file.name.startsWith(CONFIG.NOTE_TYPES.Prompts.emoji)) return 'prompt';
+		
+		// Default fallback
+		return 'note';
 	}
 
 	async cleanupMOCSystem() {
@@ -1217,6 +1840,65 @@ ${selector} .nav-folder-collapse-indicator {
 		} catch (error) {
 			console.error('Failed to cleanup broken links:', error);
 		}
+	}
+
+	/**
+	 * Cleans up empty folders after file deletions
+	 * 
+	 * Why: Prevents accumulation of empty folders that provide no value
+	 * and maintain a clean MOC structure. Only removes plugin-standard folders.
+	 */
+	async cleanupEmptyFolders(parentFolder: TFolder) {
+		try {
+			const standardFolders = Object.values(CONFIG.FOLDERS);
+			
+			// Check each standard folder (Notes, Resources, Prompts)
+			for (const folderName of standardFolders) {
+				const folder = parentFolder.children?.find(
+					child => child instanceof TFolder && child.name === folderName
+				) as TFolder;
+				
+				if (folder && this.isFolderEmpty(folder)) {
+					await this.app.vault.delete(folder);
+					console.log(`Cleaned up empty folder: ${folder.path}`);
+				}
+			}
+			
+			// Also check for empty prompt iteration folders
+			const promptsFolder = parentFolder.children?.find(
+				child => child instanceof TFolder && child.name === CONFIG.FOLDERS.Prompts
+			) as TFolder;
+			
+			if (promptsFolder) {
+				const iterationFolders = promptsFolder.children?.filter(
+					child => child instanceof TFolder
+				) as TFolder[];
+				
+				for (const iterFolder of iterationFolders || []) {
+					if (this.isFolderEmpty(iterFolder)) {
+						await this.app.vault.delete(iterFolder);
+						console.log(`Cleaned up empty iteration folder: ${iterFolder.path}`);
+					}
+				}
+				
+				// Check if Prompts folder itself is now empty
+				if (this.isFolderEmpty(promptsFolder)) {
+					await this.app.vault.delete(promptsFolder);
+					console.log(`Cleaned up empty prompts folder: ${promptsFolder.path}`);
+				}
+			}
+		} catch (error) {
+			console.error('Failed to cleanup empty folders:', error);
+		}
+	}
+
+	/**
+	 * Checks if a folder is empty (contains no files or folders)
+	 * 
+	 * Why: Helper method to determine if a folder should be cleaned up.
+	 */
+	private isFolderEmpty(folder: TFolder): boolean {
+		return !folder.children || folder.children.length === 0;
 	}
 
 	/**

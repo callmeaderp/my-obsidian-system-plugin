@@ -128,6 +128,18 @@ export class DeleteMOCContentModal extends BaseModal {
 					selected: false
 				});
 			});
+
+			// Add option to delete the entire iteration folder
+			if (iterations && iterations.length > 0) {
+				this.deletableItems.push({
+					file: iterationFolder,
+					name: `All Iterations: ${basePromptName}`,
+					category: 'Prompt Structure',
+					path: iterationFolder.path,
+					selected: false,
+					description: '⚠️ This will delete all iteration files and the folder'
+				});
+			}
 		}
 
 		// Add option to delete entire prompt (hub + iterations)
@@ -471,14 +483,49 @@ export class DeleteMOCContentModal extends BaseModal {
 	 */
 	private async deleteItem(item: DeletableItem) {
 		if (item.file instanceof TFile) {
+			// Store parent folder for cleanup
+			const parentFolder = item.file.parent;
+			
+			// Special handling for prompt hub deletion (also delete iteration folder)
+			if (this.plugin.isPromptHub(item.file) && item.description?.includes('hub file and all iterations')) {
+				const basePromptName = item.file.basename.replace(/^🤖\s/, '');
+				const iterationFolder = parentFolder?.children?.find(
+					child => child instanceof TFolder && child.name === basePromptName
+				) as TFolder;
+				
+				// Delete iteration folder first if it exists
+				if (iterationFolder) {
+					await this.app.vault.delete(iterationFolder);
+				}
+			}
+			
 			// Delete file and clean up links
 			await this.app.vault.delete(item.file);
+			
+			// Clean up empty folders after file deletion
+			if (parentFolder) {
+				await this.plugin.cleanupEmptyFolders(parentFolder);
+				
+				// If we're in a MOC, also check the MOC's parent folder
+				const mocParent = parentFolder.parent;
+				if (mocParent && this.plugin.isMOC(this.currentFile)) {
+					await this.plugin.cleanupEmptyFolders(mocParent);
+				}
+			}
 			
 			// The plugin's cleanupBrokenLinks will be triggered automatically
 			// by the vault's delete event, so we don't need to call it manually
 		} else if (item.file instanceof TFolder) {
-			// Delete entire folder (for sub-MOCs)
+			// Store parent folder for cleanup
+			const parentFolder = item.file.parent;
+			
+			// Delete entire folder (for sub-MOCs or iteration folders)
 			await this.app.vault.delete(item.file);
+			
+			// Clean up empty parent folders after folder deletion
+			if (parentFolder) {
+				await this.plugin.cleanupEmptyFolders(parentFolder);
+			}
 		}
 	}
 
