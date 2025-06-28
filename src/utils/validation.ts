@@ -168,7 +168,9 @@ export function ensureMOCSuffix(name: string): string {
  * @returns Version number if valid, null otherwise
  */
 export function extractPromptVersion(basename: string): number | null {
-	const match = basename.match(/v(\d+)$/);
+	// Look for version pattern anywhere in the basename, not just at the end
+	// Pattern: v followed by digits, optionally followed by space and description
+	const match = basename.match(/v(\d+)(?:\s|$)/);
 	if (match) {
 		const version = parseInt(match[1], 10);
 		// Ensure version is a reasonable number

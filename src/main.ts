@@ -754,7 +754,10 @@ ${selector} .nav-folder-collapse-indicator {
 	isPromptIteration(file: TFile): boolean {
 		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
 		const noteType = getFrontmatterValue(frontmatter, 'note-type', null as string | null);
-		return noteType === 'prompt' && extractPromptVersion(file.basename) !== null;
+		const version = extractPromptVersion(file.basename);
+		
+		
+		return noteType === 'prompt' && version !== null;
 	}
 
 	/**
@@ -1024,16 +1027,21 @@ ${selector} .nav-folder-collapse-indicator {
 				return;
 			}
 
-			// Find the hub file (should be in the Prompts folder)
+			// Extract the prompt base name from the iteration file name
+			// For file "🤖 Prompt Name v1.md" or "🤖 Prompt Name v2 - description.md"
+			// We want to find hub file "🤖 Prompt Name.md"
+			const iterationBaseName = file.basename.replace(/ v\d+.*$/, ''); // Remove version and everything after
+			const hubFileName = `${iterationBaseName}.md`;
+			
+			
 			const hubFile = promptsFolder.children?.find(child => 
 				child instanceof TFile && 
-				child.name.startsWith(CONFIG.NOTE_TYPES.Prompts.emoji) &&
-				child.name.endsWith('.md') &&
-				!child.path.includes('/')
+				child.name === hubFileName &&
+				child.parent?.path === promptsFolder.path // Ensure it's directly in Prompts folder, not a subfolder
 			) as TFile;
 
 			if (!hubFile) {
-				new Notice('Could not find prompt hub file.');
+				new Notice(`Could not find prompt hub file "${hubFileName}" in ${promptsFolder.path}`);
 				return;
 			}
 
