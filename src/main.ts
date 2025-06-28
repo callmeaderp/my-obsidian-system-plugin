@@ -1722,7 +1722,12 @@ ${selector} .nav-folder-collapse-indicator {
 		await this.app.vault.process(file, (content) => {
 			const lines = content.split('\n');
 			const frontmatterEnd = this.findFrontmatterEnd(lines);
-			const title = file.basename.replace(' MOC', '').replace(/^[🔥-🦉]\s+/, ''); // Remove emoji and MOC suffix
+			// Remove emoji prefix and MOC suffix using the existing hasEmojiPrefix utility
+			let title = file.basename.replace(' MOC', '');
+			if (hasEmojiPrefix(title)) {
+				// Remove the first emoji character and any following whitespace
+				title = title.replace(/^[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]\s*/u, '');
+			}
 			lines.splice(frontmatterEnd, 0, `# ${title}`, '');
 			return lines.join('\n');
 		});
