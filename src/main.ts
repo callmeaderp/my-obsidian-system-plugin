@@ -16,7 +16,7 @@ import {
 } from './utils/helpers';
 import {
 	CreateMOCModal, AddToMOCModal, VaultUpdateModal, PromptDescriptionModal,
-	CleanupConfirmationModal, ReorganizeMOCModal, UndoTestChangesModal
+	CleanupConfirmationModal, ReorganizeMOCModal, UndoTestChangesModal, DeleteMOCContentModal
 } from './modals';
 
 // =================================================================================
@@ -108,6 +108,11 @@ export default class MOCSystemPlugin extends Plugin {
 				id: 'moc-context-create', 
 				name: 'Create MOC or add content', 
 				callback: () => this.handleContextCreate() 
+			},
+			{ 
+				id: 'delete-moc-content', 
+				name: 'Delete MOC content', 
+				callback: () => this.handleContextDelete() 
 			},
 			{ 
 				id: 'update-vault-system', 
@@ -355,6 +360,29 @@ ${selector} .nav-folder-collapse-indicator {
 		} else {
 			new AddToMOCModal(this.app, activeFile, this).open();
 		}
+	}
+
+	/**
+	 * Context-aware deletion handler
+	 * 
+	 * Why: Provides safe deletion options based on current context.
+	 * Shows different deletion options depending on file type and location.
+	 */
+	async handleContextDelete() {
+		const activeFile = this.app.workspace.getActiveFile();
+		
+		if (!activeFile) {
+			new Notice('No active file to delete content from.');
+			return;
+		}
+
+		// Only allow deletion in plugin-managed contexts
+		if (!this.isPluginManagedContext(activeFile)) {
+			new Notice('Delete MOC content is only available for MOCs, prompt hubs, and plugin-created notes.');
+			return;
+		}
+
+		new DeleteMOCContentModal(this.app, activeFile, this).open();
 	}
 
 	/**
@@ -738,6 +766,58 @@ ${selector} .nav-folder-collapse-indicator {
 		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
 		const noteType = getFrontmatterValue(frontmatter, 'note-type', null as string | null);
 		return noteType === 'prompt' && !this.isPromptIteration(file);
+	}
+
+	/**
+	 * Determines if a file is in a plugin-managed context for deletion
+	 * 
+	 * Why: Deletion functionality should only be available for content
+	 * that the plugin manages to prevent accidental deletion of user files.
+	 */
+	isPluginManagedContext(file: TFile): boolean {
+		// Allow deletion for MOCs (they contain plugin-managed content)
+		if (this.isMOC(file)) {
+			return true;
+		}
+
+		// Allow deletion for prompt hubs (they manage iterations)
+		if (this.isPromptHub(file)) {
+			return true;
+		}
+
+		// Allow deletion for plugin-created files
+		if (this.isPluginCreatedFile(file)) {
+			return true;
+		}
+
+		// Check if the file is within a MOC structure
+		return this.isWithinMOCStructure(file);
+	}
+
+	/**
+	 * Checks if a file is within a MOC structure
+	 * 
+	 * Why: Files within MOC folders are part of the plugin's organizational
+	 * system and should be eligible for deletion management.
+	 */
+	private isWithinMOCStructure(file: TFile): boolean {
+		let currentFolder = file.parent;
+		
+		while (currentFolder) {
+			// Check if this folder contains a MOC file
+			const mocFile = currentFolder.children?.find(
+				child => child instanceof TFile && this.isMOC(child)
+			);
+			
+			if (mocFile) {
+				return true;
+			}
+			
+			// Move up one level
+			currentFolder = currentFolder.parent;
+		}
+		
+		return false;
 	}
 
 	/**
