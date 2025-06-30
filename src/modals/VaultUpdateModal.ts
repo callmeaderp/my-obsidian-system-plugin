@@ -5,9 +5,6 @@ import { CSS_CLASSES } from '../constants';
 
 /**
  * Modal for displaying and confirming vault-wide update operations
- * 
- * Why: Bulk updates can modify many files. Users need to see exactly what
- * will change before confirming such a potentially disruptive operation.
  */
 export class VaultUpdateModal extends BaseModal {
 	constructor(
@@ -31,8 +28,6 @@ export class VaultUpdateModal extends BaseModal {
 			this.contentEl.createEl('h3', { text: 'Files to be updated:' });
 			
 			// Scrollable list for many files
-			// Why: Update lists can be very long. Scrollable container prevents
-			// the modal from becoming too tall to fit on screen.
 			const updateList = this.contentEl.createEl('div', { cls: CSS_CLASSES.UPDATE_LIST });
 			updateList.style.cssText = 'max-height: 300px; overflow-y: auto; border: 1px solid var(--background-modifier-border); padding: 10px; border-radius: 5px;';
 
@@ -73,8 +68,6 @@ export class VaultUpdateModal extends BaseModal {
 		}
 
 		// Warning about backups
-		// Why: Bulk updates can't be easily undone. Users should understand
-		// the importance of having backups before proceeding.
 		this.createWarning('This will modify files to match the latest system requirements. It is recommended to have a backup.');
 		
 		// Additional warning for large updates
@@ -95,9 +88,6 @@ export class VaultUpdateModal extends BaseModal {
 
 	/**
 	 * Groups files by their parent directory for organized display
-	 * 
-	 * Why: Showing files grouped by directory helps users understand
-	 * the scope of changes and identify patterns.
 	 */
 	private groupFilesByDirectory(): Map<string, typeof this.updatePlan.filesToUpdate> {
 		const groups = new Map<string, typeof this.updatePlan.filesToUpdate>();

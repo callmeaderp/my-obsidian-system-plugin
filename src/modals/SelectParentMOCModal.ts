@@ -5,10 +5,6 @@ import type MOCSystemPlugin from '../main';
 
 /**
  * Modal for selecting an existing MOC as a parent
- * 
- * Why: When moving MOCs between parents, users need to see available
- * options and understand the hierarchy. This modal provides a clear
- * interface for parent selection with search and filtering.
  */
 export class SelectParentMOCModal extends BaseModal {
 	private filteredMOCs: TFile[];
@@ -35,8 +31,6 @@ export class SelectParentMOCModal extends BaseModal {
 		});
 		
 		// Search/filter input
-		// Why: Large vaults can have many MOCs. Search helps users quickly
-		// find the right parent without scrolling through long lists.
 		if (this.availableMOCs.length > 5) {
 			this.createSearchInput();
 		}
@@ -53,13 +47,6 @@ export class SelectParentMOCModal extends BaseModal {
 		
 		this.renderMOCList();
 		
-		// Helper text
-		if (this.availableMOCs.length > 0) {
-			const helperText = this.contentEl.createEl('small', {
-				text: 'Click on a MOC to select it as the new parent'
-			});
-			helperText.style.cssText = 'display: block; color: var(--text-muted); margin-top: 10px; text-align: center;';
-		}
 
 		// Cancel button
 		this.createButtons([
@@ -69,9 +56,6 @@ export class SelectParentMOCModal extends BaseModal {
 
 	/**
 	 * Creates search input for filtering MOCs
-	 * 
-	 * Why: Quick filtering improves usability when there are many MOCs.
-	 * Real-time search provides immediate feedback.
 	 */
 	private createSearchInput() {
 		const searchContainer = this.contentEl.createDiv();
@@ -104,9 +88,6 @@ export class SelectParentMOCModal extends BaseModal {
 
 	/**
 	 * Renders the list of selectable MOCs
-	 * 
-	 * Why: Dynamic rendering allows for search filtering and
-	 * provides organized presentation of options.
 	 */
 	private renderMOCList() {
 		// Clear existing list

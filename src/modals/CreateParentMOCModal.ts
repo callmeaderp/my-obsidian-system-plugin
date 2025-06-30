@@ -6,10 +6,6 @@ import type MOCSystemPlugin from '../main';
 
 /**
  * Modal for creating a new parent MOC and moving another MOC under it
- * 
- * Why: Sometimes you need to create a higher-level organization structure.
- * This modal streamlines creating a parent and establishing the hierarchy
- * in one operation.
  */
 export class CreateParentMOCModal extends BaseModal {
 	constructor(
@@ -36,33 +32,7 @@ export class CreateParentMOCModal extends BaseModal {
 		const inputEl = this.createInput('Parent MOC name...');
 		inputEl.style.marginBottom = '15px';
 		
-		// Helper text about naming
-		const helperText = this.contentEl.createEl('small', {
-			text: 'Tip: Choose a broader topic that encompasses the current MOC'
-		});
-		helperText.style.cssText = 'display: block; color: var(--text-muted); margin-bottom: 15px;';
 		
-		// Examples section
-		const examplesContainer = this.contentEl.createDiv();
-		examplesContainer.style.cssText = 'background: var(--background-secondary); padding: 10px; border-radius: 5px; margin-bottom: 15px;';
-		
-		const examplesTitle = examplesContainer.createEl('small', { 
-			text: 'Examples:' 
-		});
-		examplesTitle.style.fontWeight = 'bold';
-		
-		const examplesList = examplesContainer.createEl('ul');
-		examplesList.style.cssText = 'margin: 5px 0 0 20px; font-size: 0.85em;';
-		
-		const examples = [
-			'If moving "React Hooks", parent could be "Frontend Development"',
-			'If moving "API Design", parent could be "Software Architecture"',
-			'If moving "Meeting Notes", parent could be "Project Management"'
-		];
-		
-		examples.forEach(example => {
-			examplesList.createEl('li', { text: example });
-		});
 
 		// Submit handler
 		const submit = async () => {
@@ -111,9 +81,6 @@ export class CreateParentMOCModal extends BaseModal {
 
 	/**
 	 * Creates a visual preview of the hierarchy change
-	 * 
-	 * Why: Visual representation helps users understand the structural
-	 * change that will occur.
 	 */
 	private createHierarchyPreview() {
 		const previewContainer = this.contentEl.createDiv();

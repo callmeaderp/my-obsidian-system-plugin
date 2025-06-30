@@ -6,10 +6,6 @@ import type MOCSystemPlugin from '../main';
 
 /**
  * Modal for reorganizing MOC hierarchy
- * 
- * Why: MOC hierarchies evolve over time. This modal provides tools to
- * restructure MOCs - promoting sub-MOCs to root level, moving MOCs
- * between parents, or demoting root MOCs under new parents.
  */
 export class ReorganizeMOCModal extends BaseModal {
 	constructor(
@@ -34,9 +30,6 @@ export class ReorganizeMOCModal extends BaseModal {
 
 	/**
 	 * Shows reorganization options for root MOCs
-	 * 
-	 * Why: Root MOCs can only be moved under other MOCs (demoted),
-	 * they cannot be promoted further.
 	 */
 	private async showRootMOCOptions() {
 		this.contentEl.createEl('p', { 
@@ -46,7 +39,7 @@ export class ReorganizeMOCModal extends BaseModal {
 		// Option 1: Create new parent
 		const newParentBtn = this.createOptionButton(
 			'Move under a NEW parent MOC',
-			'Create a new MOC and move this one under it',
+			'Create new parent MOC',
 			() => {
 				setTimeout(() => {
 					new CreateParentMOCModal(this.app, this.moc, this.plugin).open();
@@ -58,7 +51,7 @@ export class ReorganizeMOCModal extends BaseModal {
 		// Option 2: Move under existing MOC
 		const existingParentBtn = this.createOptionButton(
 			'Move under an EXISTING parent MOC',
-			'Choose from existing MOCs in your vault',
+			'Select existing parent MOC',
 			async () => {
 				const availableParents = await this.getAvailableParents();
 				if (availableParents.length === 0) {
@@ -86,9 +79,6 @@ export class ReorganizeMOCModal extends BaseModal {
 
 	/**
 	 * Shows reorganization options for sub-MOCs
-	 * 
-	 * Why: Sub-MOCs have more flexibility - they can be promoted to root
-	 * level or moved to different parent MOCs.
 	 */
 	private async showSubMOCOptions() {
 		this.contentEl.createEl('p', { 
@@ -98,7 +88,7 @@ export class ReorganizeMOCModal extends BaseModal {
 		// Option 1: Promote to root
 		const promoteBtn = this.createOptionButton(
 			'Promote to a root MOC',
-			'Make this MOC independent at the vault root level',
+			'Make independent at root level',
 			() => this.plugin.promoteSubMOCToRoot(this.moc),
 			true
 		);
@@ -106,7 +96,7 @@ export class ReorganizeMOCModal extends BaseModal {
 		// Option 2: Move to different parent
 		const moveBtn = this.createOptionButton(
 			'Move to a different parent MOC',
-			'Transfer this MOC to another parent',
+			'Move to different parent',
 			async () => {
 				const availableParents = await this.getAvailableParents();
 				if (availableParents.length === 0) {
@@ -135,9 +125,6 @@ export class ReorganizeMOCModal extends BaseModal {
 
 	/**
 	 * Creates a styled option button with description
-	 * 
-	 * Why: Consistent button styling with descriptions helps users
-	 * understand what each action will do before clicking.
 	 */
 	private createOptionButton(
 		text: string,
@@ -166,9 +153,6 @@ export class ReorganizeMOCModal extends BaseModal {
 
 	/**
 	 * Gets list of MOCs that can serve as parents
-	 * 
-	 * Why: Prevents circular dependencies by filtering out MOCs that
-	 * would create loops in the hierarchy.
 	 */
 	private async getAvailableParents(): Promise<TFile[]> {
 		const allMOCs = await this.plugin.getAllMOCs();

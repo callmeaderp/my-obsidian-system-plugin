@@ -5,9 +5,6 @@ import type MOCSystemPlugin from '../main';
 
 /**
  * Modal for creating new root MOCs with optional prompt creation
- * 
- * Why: Root MOC creation is a primary plugin action that needs a dedicated UI.
- * The optional prompt creation streamlines common workflow of creating both together.
  */
 export class CreateMOCModal extends BaseModal {
 	constructor(
@@ -26,8 +23,6 @@ export class CreateMOCModal extends BaseModal {
 		mocNameEl.style.marginBottom = '15px';
 
 		// Optional prompt creation section
-		// Why: Users often create a MOC and immediately want a prompt for it.
-		// This saves them from having to create the prompt separately.
 		const promptSection = this.contentEl.createDiv({ cls: CSS_CLASSES.CREATION_PROMPT_SECTION });
 		promptSection.style.cssText = 'border-top: 1px solid var(--background-modifier-border); padding-top: 15px; margin-top: 15px;';
 
@@ -45,7 +40,7 @@ export class CreateMOCModal extends BaseModal {
 		// Toggle prompt name input visibility based on checkbox
 		const promptNameEl = promptSection.createEl('input', { 
 			type: 'text', 
-			placeholder: 'Prompt name (leave empty to use MOC name)...' 
+			placeholder: 'Prompt name...' 
 		});
 		promptNameEl.style.width = '100%';
 		promptNameEl.style.display = 'none';

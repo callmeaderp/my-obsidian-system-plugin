@@ -5,7 +5,6 @@ import MOCSystemPlugin from '../main';
 
 /**
  * Interface for deletable items with metadata
- * Provides all information needed for organized display and safe deletion
  */
 interface DeletableItem {
 	/** The file or folder to be deleted */
@@ -24,9 +23,6 @@ interface DeletableItem {
 
 /**
  * Context-aware deletion modal for MOC system content
- * 
- * Why: Provides safe, organized deletion of plugin-created content with
- * multiple selection capability and context-aware options based on current location.
  */
 export class DeleteMOCContentModal extends BaseModal {
 	private deletableItems: DeletableItem[] = [];
@@ -54,9 +50,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Loads deletable items based on current context
-	 * 
-	 * Why: Different contexts (MOC, prompt hub, regular note) have different
-	 * deletion options that need to be presented appropriately.
 	 */
 	private async loadDeletableItems() {
 		if (this.plugin.isMOC(this.currentFile)) {
@@ -70,9 +63,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Loads deletable items when current file is a MOC
-	 * 
-	 * Why: MOCs contain organized content in subfolders that users may want
-	 * to selectively delete while maintaining the overall structure.
 	 */
 	private async loadMOCDeletableItems() {
 		const mocFolder = this.currentFile.parent;
@@ -99,9 +89,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Loads deletable items when current file is a prompt hub
-	 * 
-	 * Why: Prompt hubs manage multiple iterations that users may want to
-	 * selectively delete or clean up old versions.
 	 */
 	private async loadPromptHubDeletableItems() {
 		const promptsFolder = this.currentFile.parent;
@@ -155,9 +142,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Loads deletable items when current file is a regular note
-	 * 
-	 * Why: Regular notes can be deleted individually, and if they're part of
-	 * a MOC system, their links should be cleaned up automatically.
 	 */
 	private async loadRegularNoteDeletableItems() {
 		this.deletableItems.push({
@@ -172,9 +156,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Adds sub-MOCs from the given MOC folder
-	 * 
-	 * Why: Sub-MOCs are organized hierarchically and users may want to
-	 * reorganize or remove specific sub-topics.
 	 */
 	private async addSubMOCs(mocFolder: TFolder) {
 		const standardFolderNames = Object.values(CONFIG.FOLDERS);
@@ -204,9 +185,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Adds content from a specific folder within the MOC structure
-	 * 
-	 * Why: Users may want to clean up specific types of content while
-	 * keeping the overall MOC structure intact.
 	 */
 	private async addFolderContent(mocFolder: TFolder, folderName: string, category: string) {
 		const folder = mocFolder.children?.find(
@@ -233,9 +211,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Creates the main modal interface with grouped checkboxes
-	 * 
-	 * Why: Organized interface makes it easy to understand what will be
-	 * deleted and allows for selective multiple deletion.
 	 */
 	private createInterface() {
 		this.contentEl.createEl('h2', { text: 'Delete MOC Content' });
@@ -266,9 +241,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Groups deletable items by category for organized display
-	 * 
-	 * Why: Logical grouping helps users understand what types of content
-	 * they're deleting and makes selection more intuitive.
 	 */
 	private groupItemsByCategory(): Map<string, DeletableItem[]> {
 		const grouped = new Map<string, DeletableItem[]>();
@@ -290,9 +262,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Creates a section for a specific category of deletable items
-	 * 
-	 * Why: Clear visual separation between different types of content
-	 * makes the interface easier to navigate and understand.
 	 */
 	private createCategorySection(category: string, items: DeletableItem[]) {
 		// Category header
@@ -340,9 +309,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Creates controls for bulk selection operations
-	 * 
-	 * Why: When dealing with many items, bulk selection controls significantly
-	 * improve user experience and efficiency.
 	 */
 	private createSelectionControls() {
 		const controlsContainer = this.contentEl.createEl('div');
@@ -386,9 +352,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Creates action buttons for deletion and cancellation
-	 * 
-	 * Why: Clear action buttons with appropriate styling ensure users
-	 * can easily complete or cancel the operation.
 	 */
 	private createActionButtons() {
 		this.createButtons([
@@ -406,8 +369,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Selects or deselects all items
-	 * 
-	 * Why: Bulk selection improves efficiency when working with many items.
 	 */
 	private selectAll(selected: boolean) {
 		this.deletableItems.forEach(item => {
@@ -421,9 +382,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Executes the deletion of selected items
-	 * 
-	 * Why: Performs the actual deletion with proper error handling and
-	 * user feedback about the operation's progress and results.
 	 */
 	private async executeDelection() {
 		const selectedItems = this.deletableItems.filter(item => item.selected);
@@ -477,9 +435,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Deletes a single item with appropriate handling for different types
-	 * 
-	 * Why: Different item types require different deletion strategies
-	 * (files vs folders, with proper link cleanup).
 	 */
 	private async deleteItem(item: DeletableItem) {
 		if (item.file instanceof TFile) {
@@ -531,9 +486,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Shows message when no deletable items are found
-	 * 
-	 * Why: Provides clear feedback when the current context has no
-	 * plugin-created content that can be deleted.
 	 */
 	private showNoItemsMessage() {
 		this.contentEl.createEl('h2', { text: 'No Content to Delete' });
@@ -550,9 +502,6 @@ export class DeleteMOCContentModal extends BaseModal {
 
 	/**
 	 * Checks if a file was created by this plugin
-	 * 
-	 * Why: Only plugin-created files should be offered for deletion
-	 * to prevent accidental removal of user-created content.
 	 */
 	private isPluginCreatedFile(file: TFile): boolean {
 		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;

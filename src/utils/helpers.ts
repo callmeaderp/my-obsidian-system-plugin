@@ -8,9 +8,6 @@ import { ColorInfo } from '../types';
 /**
  * Generates a random emoji from predefined Unicode ranges
  * 
- * Why: Visual identifiers help users quickly distinguish between different MOCs
- * in the file explorer. Random selection ensures uniqueness without user effort.
- * 
  * @returns A single emoji character
  */
 export function getRandomEmoji(): string {
@@ -25,10 +22,6 @@ export function getRandomEmoji(): string {
 
 /**
  * Generates random HSL color values optimized for UI visibility
- * 
- * Why: Each MOC gets a unique color for its folder in the file explorer.
- * HSL color space allows us to control saturation and lightness for
- * consistent visual appearance across different hues.
  * 
  * @returns Color information with computed theme variants
  */
@@ -58,9 +51,6 @@ export function generateRandomColor(): ColorInfo {
 /**
  * Converts HSL color string to HSLA with specified opacity
  * 
- * Why: CSS gradients need varying opacity levels for subtle visual effects.
- * This maintains the color while adjusting transparency.
- * 
  * @param hslColor - HSL color string (e.g., 'hsl(240, 100%, 50%)')
  * @param opacity - Opacity value between 0 and 1
  * @returns HSLA color string
@@ -76,9 +66,6 @@ export function adjustColorOpacity(hslColor: string, opacity: number): string {
 /**
  * Checks if a string starts with an emoji character
  * 
- * Why: Used to determine if a file already has an emoji prefix,
- * preventing double-prefixing during updates or migrations.
- * 
  * @param text - Text to check
  * @returns True if text starts with an emoji
  */
@@ -90,9 +77,6 @@ export function hasEmojiPrefix(text: string): boolean {
 
 /**
  * Safely extracts frontmatter value with type checking
- * 
- * Why: Frontmatter can contain various types and may be missing.
- * This provides type-safe access with proper defaults.
  * 
  * @param frontmatter - Frontmatter object from metadata cache
  * @param key - Key to extract
@@ -130,9 +114,6 @@ export function getFrontmatterValue<T>(
 /**
  * Debounces a function to limit execution frequency
  * 
- * Why: Style updates and file operations can be triggered rapidly.
- * Debouncing prevents performance issues from excessive calls.
- * 
  * @param func - Function to debounce
  * @param wait - Milliseconds to wait
  * @returns Debounced function
@@ -160,9 +141,6 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Creates a delay using Promise
  * 
- * Why: Some operations need delays to ensure Obsidian's UI has updated
- * or to prevent race conditions with file system operations.
- * 
  * @param ms - Milliseconds to delay
  * @returns Promise that resolves after delay
  */
@@ -172,9 +150,6 @@ export function delay(ms: number): Promise<void> {
 
 /**
  * Safely parses a string to integer with validation
- * 
- * Why: Version numbers and other numeric values in strings need
- * safe parsing with proper error handling.
  * 
  * @param value - String to parse
  * @param defaultValue - Default if parsing fails

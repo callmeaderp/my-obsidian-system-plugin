@@ -25,10 +25,6 @@ import {
 
 /**
  * Main plugin class implementing a hierarchical MOC-based note-taking system
- * 
- * Why: Provides context-aware creation, organization, and maintenance tools
- * for managing large knowledge bases using Maps of Content (MOCs) as the
- * primary organizational structure.
  */
 export default class MOCSystemPlugin extends Plugin {
 	settings: PluginSettings;
@@ -41,14 +37,10 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Plugin initialization sequence
-	 * 
-	 * Why: Loads settings, registers commands, sets up event listeners, and
-	 * initializes styling system with proper timing for Obsidian's lifecycle.
 	 */
 	async onload() {
 		try {
 			// Track session state for undo functionality
-			// Why: Enables users to safely test plugin features and undo test changes
 			this.sessionStartTime = Date.now();
 			this.initialFileSet = new Set(this.app.vault.getMarkdownFiles().map(f => f.path));
 			
@@ -66,8 +58,6 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Plugin cleanup
-	 * 
-	 * Why: Removes styling and cleans up resources when plugin is disabled.
 	 */
 	onunload() {
 		this.removeStyles();
@@ -80,16 +70,12 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Initializes the styling system with proper timing
-	 * 
-	 * Why: Obsidian's initialization happens in stages. We need to apply styles
-	 * at the right times to ensure they work properly across different layouts.
 	 */
 	private initializeStyles() {
 		// Initial application after basic plugin load
 		setTimeout(() => this.updateMOCStyles(), CONFIG.STYLE_DELAYS.INITIAL);
 		
 		// Re-apply after workspace layout is fully ready
-		// Why: Some styling only works after the file explorer is rendered
 		this.app.workspace.onLayoutReady(() => 
 			setTimeout(() => this.updateMOCStyles(), CONFIG.STYLE_DELAYS.LAYOUT_READY)
 		);
@@ -97,9 +83,6 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Registers all plugin commands
-	 * 
-	 * Why: Centralizes command registration for easier maintenance and
-	 * separates context-dependent commands from always-available ones.
 	 */
 	private registerCommands() {
 		// Always-available commands
@@ -175,9 +158,6 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Registers event listeners for plugin functionality
-	 * 
-	 * Why: Automatic cleanup of broken links maintains vault integrity
-	 * when files are deleted.
 	 */
 	private registerEventListeners() {
 		// Clean up broken links when files are deleted
@@ -217,9 +197,6 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Updates CSS styles for MOC folder coloring
-	 * 
-	 * Why: Each MOC gets a unique color in the file explorer for visual hierarchy.
-	 * Combines base styles with dynamically generated color rules.
 	 */
 	async updateMOCStyles() {
 		try {
@@ -244,9 +221,6 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Loads base CSS from the plugin directory
-	 * 
-	 * Why: Separates static styles from dynamic color generation.
-	 * Returns empty string gracefully if file is missing.
 	 */
 	private async loadBaseCss(): Promise<string> {
 		try {
@@ -260,9 +234,6 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Generates CSS for individual MOC folder colors
-	 * 
-	 * Why: Each MOC needs theme-specific styling for both light and dark modes.
-	 * CSS is generated from frontmatter color information.
 	 */
 	private async generateMOCColorStyles(): Promise<string> {
 		const allMOCs = await this.getAllMOCs();
@@ -292,9 +263,6 @@ export default class MOCSystemPlugin extends Plugin {
 
 	/**
 	 * Generates CSS rules for a specific MOC folder and theme
-	 * 
-	 * Why: Creates theme-specific selectors with appropriate opacity levels
-	 * for visual hierarchy without overwhelming the interface.
 	 */
 	private generateThemeCSS(escapedPath: string, color: string, theme: 'light' | 'dark'): string {
 		const themeConfig = THEME_CONFIGS[theme];
@@ -322,8 +290,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Escapes special characters for CSS selectors
-	 * 
-	 * Why: File paths can contain characters that need escaping in CSS.
 	 */
 	private escapeForCSS(path: string): string {
 		return path.replace(/['"\\]/g, '\\$&');
@@ -331,9 +297,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Removes all plugin-generated styles
-	 * 
-	 * Why: Clean removal prevents style conflicts when plugin is disabled
-	 * or reloaded.
 	 */
 	removeStyles() {
 		if (this.styleElement) {
@@ -348,9 +311,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Context-aware creation handler
-	 * 
-	 * Why: Determines appropriate action based on current context.
-	 * Creates root MOC if no active file, adds to MOC if in MOC context.
 	 */
 	async handleContextCreate() {
 		const activeFile = this.app.workspace.getActiveFile();
@@ -364,9 +324,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Context-aware deletion handler
-	 * 
-	 * Why: Provides safe deletion options based on current context.
-	 * Shows different deletion options depending on file type and location.
 	 */
 	async handleContextDelete() {
 		const activeFile = this.app.workspace.getActiveFile();
@@ -387,9 +344,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Creates a new root MOC with complete structure
-	 * 
-	 * Why: Root MOCs need their own folder hierarchy and unique styling.
-	 * This method handles all the setup in one operation.
 	 */
 	async createMOC(name: string): Promise<TFile> {
 		try {
@@ -429,9 +383,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Creates a sub-MOC within an existing MOC structure
-	 * 
-	 * Why: Sub-MOCs organize topics within larger MOCs while maintaining
-	 * the hierarchical structure and automatic linking.
 	 */
 	async createSubMOC(parentMOC: TFile, name: string): Promise<TFile> {
 		try {
@@ -485,9 +436,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Unified factory method for creating different file types
-	 * 
-	 * Why: Reduces code duplication and ensures consistent creation patterns
-	 * across all file types while handling type-specific requirements.
 	 */
 	async createFile(config: CreateConfig): Promise<TFile> {
 		try {
@@ -546,9 +494,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Creates prompt hub with iteration tracking
-	 * 
-	 * Why: Prompts evolve through iterations. This creates both a hub file
-	 * for managing iterations and the first iteration file.
 	 */
 	private async createPromptWithIterations(
 		config: CreateConfig, 
@@ -594,9 +539,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Builds complete file path with proper naming conventions
-	 * 
-	 * Why: Consistent file naming across all types with proper emoji prefixes
-	 * and folder organization.
 	 */
 	private buildFileName(name: string, config: any, parentPath: string): string {
 		const suffix = config.suffix ? ` ${config.suffix}` : '';
@@ -606,8 +548,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Generates YAML frontmatter from data object
-	 * 
-	 * Why: Consistent frontmatter formatting with proper array and scalar handling.
 	 */
 	private buildFrontmatter(data: Record<string, any>): string {
 		const lines = ['---'];
@@ -627,9 +567,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Converts color information to frontmatter properties
-	 * 
-	 * Why: Stores color data in frontmatter for persistence and retrieval
-	 * during style generation.
 	 */
 	private colorToFrontmatter(color: ColorInfo): Record<string, any> {
 		return {
@@ -643,8 +580,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Maps file types to MOC section names
-	 * 
-	 * Why: Maintains consistent organization within MOC files.
 	 */
 	private typeToSection(type: NoteType): SectionType {
 		const mapping: Record<NoteType, SectionType> = {
@@ -658,8 +593,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Creates file with content and proper error handling
-	 * 
-	 * Why: Centralizes file creation with normalized paths and error wrapping.
 	 */
 	private async createFileWithContent(path: string, content: string): Promise<TFile> {
 		try {
@@ -671,8 +604,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Opens file and shows success notification
-	 * 
-	 * Why: Provides immediate feedback and context after file creation.
 	 */
 	private async openFileAndNotify(file: TFile, message: string): Promise<void> {
 		try {
@@ -687,9 +618,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Ensures complete MOC folder structure exists
-	 * 
-	 * Why: MOCs require standardized subfolders for organization.
-	 * Creates all necessary folders in one operation.
 	 */
 	async ensureMOCFolderStructure(mocFolderPath: string) {
 		try {
@@ -727,9 +655,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Determines if a file is a MOC
-	 * 
-	 * Why: MOCs are identified by frontmatter tags for reliable detection
-	 * across different naming conventions.
 	 */
 	isMOC(file: TFile): boolean {
 		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
@@ -739,8 +664,6 @@ ${selector} .nav-folder-collapse-indicator {
 	
 	/**
 	 * Determines if a MOC is at root level
-	 * 
-	 * Why: Root MOCs have different reorganization options than sub-MOCs.
 	 */
 	isRootMOC(file: TFile): boolean {
 		return this.isMOC(file) && !(file.parent?.path || '').includes('/');
@@ -748,8 +671,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Determines if a file is a versioned prompt iteration
-	 * 
-	 * Why: Prompt iterations have special duplication and management features.
 	 */
 	isPromptIteration(file: TFile): boolean {
 		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
@@ -762,8 +683,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Determines if a file is a prompt hub
-	 * 
-	 * Why: Prompt hubs manage iterations and have special link-opening features.
 	 */
 	isPromptHub(file: TFile): boolean {
 		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
@@ -773,9 +692,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Determines if a file is in a plugin-managed context for deletion
-	 * 
-	 * Why: Deletion functionality should only be available for content
-	 * that the plugin manages to prevent accidental deletion of user files.
 	 */
 	isPluginManagedContext(file: TFile): boolean {
 		// Allow deletion for MOCs (they contain plugin-managed content)
@@ -799,9 +715,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Checks if a file is within a MOC structure
-	 * 
-	 * Why: Files within MOC folders are part of the plugin's organizational
-	 * system and should be eligible for deletion management.
 	 */
 	private isWithinMOCStructure(file: TFile): boolean {
 		let currentFolder = file.parent;
@@ -825,9 +738,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Gets all MOC files in the vault
-	 * 
-	 * Why: Many operations need to work with all MOCs for organization
-	 * and hierarchy management.
 	 */
 	async getAllMOCs(): Promise<TFile[]> {
 		return this.app.vault.getMarkdownFiles().filter(f => this.isMOC(f));
@@ -835,8 +745,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Detects circular dependencies in MOC hierarchy
-	 * 
-	 * Why: Prevents infinite loops when reorganizing MOC relationships.
 	 */
 	detectCircularDependency(moc: TFile, potentialParent: TFile): boolean {
 		const visited = new Set<string>();
@@ -867,9 +775,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Adds a link to a new file in the correct MOC section
-	 * 
-	 * Why: Maintains organized structure within MOC files with proper
-	 * section ordering and automatic reorganization.
 	 */
 	async addToMOCSection(moc: TFile, section: SectionType, newFile: TFile) {
 		try {
@@ -1083,9 +988,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Adds a new iteration link to the prompt hub file
-	 * 
-	 * Why: Keeps the hub file synchronized with all available iterations.
-	 * Maintains the organized list structure for easy navigation.
 	 */
 	private async addIterationToHub(hubFile: TFile, newIterationFile: TFile) {
 		try {
@@ -1196,9 +1098,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Validates if a string is a properly formatted URL
-	 * 
-	 * Why: Prevents attempting to open invalid URLs which could cause errors
-	 * or unexpected behavior in the browser.
 	 */
 	private isValidUrl(urlString: string): boolean {
 		try {
@@ -1335,9 +1234,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Analyzes all plugin files and generates a comprehensive update plan
-	 * 
-	 * Why: Identifies outdated patterns and missing features across the vault
-	 * to bring all files up to current system standards.
 	 */
 	private async generateVaultUpdatePlan(): Promise<VaultUpdatePlan> {
 		const allFiles = this.app.vault.getMarkdownFiles();
@@ -1362,9 +1258,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Analyzes a single file for potential updates
-	 * 
-	 * Why: Comprehensive per-file analysis ensures all aspects of the current
-	 * system standards are checked and brought up to date.
 	 */
 	private async analyzeFileForUpdates(file: TFile): Promise<string[]> {
 		const updates: string[] = [];
@@ -1513,9 +1406,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Executes the planned vault updates
-	 * 
-	 * Why: Applies all planned changes systematically with proper error handling
-	 * and progress feedback.
 	 */
 	private async executeVaultUpdates(updatePlan: VaultUpdatePlan): Promise<void> {
 		try {
@@ -1828,8 +1718,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Cleans up broken links when files are deleted
-	 * 
-	 * Why: Maintains vault integrity by removing references to deleted files.
 	 */
 	async cleanupBrokenLinks(deletedFile: TFile) {
 		try {
@@ -1857,9 +1745,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Cleans up empty folders after file deletions
-	 * 
-	 * Why: Prevents accumulation of empty folders that provide no value
-	 * and maintain a clean MOC structure. Only removes plugin-standard folders.
 	 */
 	async cleanupEmptyFolders(parentFolder: TFolder) {
 		try {
@@ -1907,8 +1792,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Checks if a folder is empty (contains no files or folders)
-	 * 
-	 * Why: Helper method to determine if a folder should be cleaned up.
 	 */
 	private isFolderEmpty(folder: TFolder): boolean {
 		return !folder.children || folder.children.length === 0;
@@ -1916,8 +1799,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Checks if a file was created by this plugin
-	 * 
-	 * Why: Ensures only plugin-created files are affected by cleanup operations.
 	 */
 	private isPluginCreatedFile(file: TFile): boolean {
 		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
@@ -1931,9 +1812,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Executes functions with comprehensive error handling
-	 * 
-	 * Why: Provides consistent error handling across all plugin operations
-	 * with appropriate user feedback.
 	 */
 	private async executeWithErrorHandling(fn: () => Promise<void> | void) {
 		try {
@@ -1945,9 +1823,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Wraps errors with additional context
-	 * 
-	 * Why: Provides meaningful error messages with operation context
-	 * for better debugging and user feedback.
 	 */
 	private wrapError(error: unknown, message: string, operation: string, path?: string): Error {
 		if (isMOCSystemError(error)) {
@@ -1963,9 +1838,6 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Centralized error handling with user feedback
-	 * 
-	 * Why: Consistent error presentation to users while maintaining
-	 * detailed logging for debugging.
 	 */
 	private handleError(message: string, error: any): void {
 		if (isMOCSystemError(error)) {

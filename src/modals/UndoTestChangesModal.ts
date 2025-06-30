@@ -4,10 +4,6 @@ import { CSS_CLASSES } from '../constants';
 
 /**
  * Modal for confirming undo of test changes made during current session
- * 
- * Why: During plugin development and testing, users create files to test
- * functionality. This modal provides a safe way to clean up test files
- * without affecting pre-existing content.
  */
 export class UndoTestChangesModal extends BaseModal {
 	constructor(
@@ -22,8 +18,6 @@ export class UndoTestChangesModal extends BaseModal {
 		this.contentEl.createEl('h2', { text: 'Undo Test Changes' });
 		
 		// Session-specific explanation
-		// Why: Users need to understand that only session-created files
-		// will be deleted, not their existing work.
 		this.contentEl.createEl('p', { 
 			text: `This will delete ${this.filesToDelete.length} files created since Obsidian started.` 
 		});
@@ -87,34 +81,21 @@ export class UndoTestChangesModal extends BaseModal {
 		}
 
 		// Time-based context
-		// Why: Helps users understand when these files were created
-		// relative to their current session.
 		const timeContext = this.contentEl.createEl('small', {
 			text: 'These files were created during your current Obsidian session and are safe to remove for testing purposes.'
 		});
 		timeContext.style.cssText = 'display: block; color: var(--text-muted); margin: 15px 0; text-align: center;';
 
 		// Action buttons
-		// Why: "Undo" is more user-friendly than "Delete" for this context
-		// since it implies reversing recent actions rather than permanent loss.
 		this.createButtons([
 			{ text: 'Cancel', action: () => {}, primary: true },
 			{ text: `Undo ${this.filesToDelete.length} Test Files`, action: this.onConfirm }
 		]);
 		
-		// Recovery hint
-		const recoveryHint = this.contentEl.createEl('small', {
-			text: 'Tip: Test files can be recreated using the plugin commands if needed'
-		});
-		recoveryHint.style.cssText = 'display: block; text-align: center; color: var(--text-muted); margin-top: 10px;';
 	}
 
 	/**
 	 * Groups files by their note type for organized display
-	 * 
-	 * Why: When undoing test changes, it's helpful to see what types of
-	 * content were created during testing. This helps users verify they're
-	 * removing the right files.
 	 */
 	private groupFilesByType(files: TFile[]): Map<string, TFile[]> {
 		const groups = new Map<string, TFile[]>();
@@ -142,7 +123,6 @@ export class UndoTestChangesModal extends BaseModal {
 		}
 		
 		// Sort files within each group by creation time (newest first)
-		// Why: Recent files are more likely to be test files users want to remove
 		for (const files of groups.values()) {
 			files.sort((a, b) => b.stat.ctime - a.stat.ctime);
 		}

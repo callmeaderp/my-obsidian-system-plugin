@@ -9,9 +9,6 @@ import { ValidationError } from '../errors';
 /**
  * Validates and sanitizes file/folder names for cross-platform compatibility
  * 
- * Why: Different operating systems have different rules for valid filenames.
- * This ensures created files work across Windows, macOS, and Linux.
- * 
  * @param name - The proposed file or folder name
  * @param isFolder - Whether validating a folder name (slightly different rules)
  * @returns Validation result with sanitized name or error message
@@ -88,9 +85,6 @@ export function validateFileName(name: string, isFolder: boolean = false): Valid
 /**
  * Validates a complete file path including parent directories
  * 
- * Why: Ensures the entire path is valid, not just the filename.
- * Important for deeply nested MOC structures.
- * 
  * @param path - The complete file path to validate
  * @returns Validation result
  */
@@ -117,9 +111,6 @@ export function validateFilePath(path: string): ValidationResult {
  * Validates and sanitizes user input with specific context
  * Throws ValidationError for invalid input that cannot be sanitized
  * 
- * Why: Provides a consistent validation interface that either returns
- * clean input or throws with a helpful error message.
- * 
  * @param input - User-provided input
  * @param context - What the input is for (e.g., "MOC name", "Note title")
  * @param isFolder - Whether this will be a folder name
@@ -144,9 +135,6 @@ export function sanitizeInput(input: string, context: string, isFolder: boolean 
 /**
  * Ensures a MOC name ends with ' MOC' suffix
  * 
- * Why: Consistent naming helps users identify MOC files at a glance
- * and prevents naming conflicts with regular notes.
- * 
  * @param name - The proposed MOC name
  * @returns Name with ' MOC' suffix if not already present
  */
@@ -160,9 +148,6 @@ export function ensureMOCSuffix(name: string): string {
 
 /**
  * Validates prompt version format
- * 
- * Why: Prompt iterations follow a specific naming pattern (v1, v2, etc.)
- * This ensures consistency in version numbering.
  * 
  * @param basename - The file basename to check
  * @returns Version number if valid, null otherwise

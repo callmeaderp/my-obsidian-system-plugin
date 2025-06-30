@@ -4,9 +4,6 @@ import { CSS_CLASSES } from '../constants';
 
 /**
  * Modal for confirming MOC system file cleanup
- * 
- * Why: File deletion is destructive and irreversible. This modal ensures
- * users understand exactly what will be deleted before proceeding.
  */
 export class CleanupConfirmationModal extends BaseModal {
 	constructor(
@@ -80,24 +77,15 @@ export class CleanupConfirmationModal extends BaseModal {
 		confirmText.style.cssText = 'margin-top: 15px; font-weight: 500;';
 
 		// Action buttons
-		// Why: Destructive action is not primary to prevent accidental clicks
 		this.createButtons([
 			{ text: 'Cancel', action: () => {}, primary: true },
 			{ text: 'Delete All Files', action: this.onConfirm }
 		]);
 		
-		// Extra safety hint
-		const safetyHint = this.contentEl.createEl('small', {
-			text: 'Tip: Create a backup of your vault before proceeding with cleanup'
-		});
-		safetyHint.style.cssText = 'display: block; text-align: center; color: var(--text-muted); margin-top: 10px;';
 	}
 
 	/**
 	 * Groups files by their note type for organized display
-	 * 
-	 * Why: Showing files grouped by type helps users understand
-	 * what content will be removed from each category.
 	 */
 	private groupFilesByType(): Map<string, TFile[]> {
 		const groups = new Map<string, TFile[]>();
