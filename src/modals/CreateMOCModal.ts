@@ -5,6 +5,9 @@ import type MOCSystemPlugin from '../main';
 
 /**
  * Modal for creating new root MOCs with optional prompt creation
+ * 
+ * Provides a streamlined interface for creating both MOCs and initial prompts
+ * in a single action, reducing the steps needed to start a new project area.
  */
 export class CreateMOCModal extends BaseModal {
 	constructor(
@@ -23,6 +26,7 @@ export class CreateMOCModal extends BaseModal {
 		mocNameEl.style.marginBottom = '15px';
 
 		// Optional prompt creation section
+		// Separated visually to indicate it's an additional feature
 		const promptSection = this.contentEl.createDiv({ cls: CSS_CLASSES.CREATION_PROMPT_SECTION });
 		promptSection.style.cssText = 'border-top: 1px solid var(--background-modifier-border); padding-top: 15px; margin-top: 15px;';
 
@@ -45,6 +49,10 @@ export class CreateMOCModal extends BaseModal {
 		promptNameEl.style.width = '100%';
 		promptNameEl.style.display = 'none';
 
+		/**
+		 * Toggles prompt name input visibility and focuses it when shown
+		 * Provides better UX by automatically focusing the field when user opts in
+		 */
 		const togglePromptNameInput = () => {
 			promptNameEl.style.display = createPromptCheckbox.checked ? 'block' : 'none';
 			if (createPromptCheckbox.checked && promptNameEl.style.display === 'block') {
@@ -65,6 +73,7 @@ export class CreateMOCModal extends BaseModal {
 			const mocName = mocNameEl.value.trim();
 			if (!mocName) {
 				// Flash the input to indicate it's required
+				// Visual feedback is less disruptive than an error notice
 				mocNameEl.style.borderColor = 'var(--text-error)';
 				setTimeout(() => {
 					mocNameEl.style.borderColor = '';
@@ -78,6 +87,7 @@ export class CreateMOCModal extends BaseModal {
 				// Create prompt if requested
 				if (createPromptCheckbox.checked) {
 					// Use MOC name without 'MOC' suffix as default prompt name
+					// This provides a sensible default when user doesn't specify
 					const promptName = promptNameEl.value.trim() || 
 						mocName.replace(/\s+MOC$/i, '').trim() || 
 						mocName;
@@ -85,6 +95,7 @@ export class CreateMOCModal extends BaseModal {
 					await this.plugin.createPrompt(mocFile, promptName);
 					
 					// Small delay to ensure styles are updated after both operations
+					// DOM updates need time to propagate before style recalculation
 					setTimeout(() => this.plugin.updateMOCStyles(), 150);
 				}
 				
