@@ -4,10 +4,10 @@
 This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) system for note organization. The plugin is currently stable and fully functional.
 
 ## Current State
-- **Status**: Redesign in progress - Phase 3 complete
-- **Last update**: Phase 3 - Prompt system overhauled, hub files eliminated
-- **Active development**: Phase 4 pending - Polish & enhancement
-- **See**: PLUGIN_REDESIGN_PLAN.md for full roadmap, PHASE3_TEST_PLAN.md for Phase 3 details
+- **Status**: Redesign in progress - Phase 4 complete
+- **Last update**: Phase 4 - Default content, smart emoji detection, performance optimizations
+- **Active development**: Core redesign complete, drag-drop support deferred
+- **See**: PLUGIN_REDESIGN_PLAN.md for full roadmap
 
 ## File Inventory
 

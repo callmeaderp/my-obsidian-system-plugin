@@ -33,6 +33,10 @@ export default class MOCSystemPlugin extends Plugin {
 	private sessionStartTime: number;
 	private initialFileSet: Set<string>;
 	
+	// Performance optimization: Cache MOC metadata
+	private mocMetadataCache: Map<string, { lightColor: string | null; darkColor: string | null }> = new Map();
+	private lastMOCUpdate: number = 0;
+	
 	// Debounced style update to prevent excessive DOM manipulation
 	private debouncedStyleUpdate = debounce(() => this.updateMOCStyles(), CONFIG.STYLE_DELAYS.UPDATE);
 
@@ -208,6 +212,15 @@ export default class MOCSystemPlugin extends Plugin {
 				}
 			})
 		);
+
+		// Smart emoji detection for automatic file type determination
+		this.registerEvent(
+			this.app.vault.on('create', async (file) => {
+				if (file instanceof TFile && file.extension === 'md') {
+					await this.handleSmartEmojiDetection(file);
+				}
+			})
+		);
 	}
 
 	// =================================================================================
@@ -227,7 +240,7 @@ export default class MOCSystemPlugin extends Plugin {
 	// =================================================================================
 
 	/**
-	 * Updates CSS styles for MOC folder coloring
+	 * Updates CSS styles for MOC folder coloring with optimized DOM updates
 	 */
 	async updateMOCStyles() {
 		try {
@@ -235,11 +248,18 @@ export default class MOCSystemPlugin extends Plugin {
 			const mocStyles = await this.generateMOCColorStyles();
 			const combinedStyles = `${baseCss}\n\n/* ===== DYNAMIC MOC COLORS ===== */\n${mocStyles}`;
 
-			this.removeStyles();
-			this.styleElement = document.createElement('style');
-			this.styleElement.id = 'moc-system-plugin-styles';
-			this.styleElement.textContent = combinedStyles;
-			document.head.appendChild(this.styleElement);
+			// Performance optimization: Update existing style element if possible
+			if (this.styleElement && this.styleElement.parentNode) {
+				// Update existing element content
+				this.styleElement.textContent = combinedStyles;
+			} else {
+				// Create new element only if needed
+				this.removeStyles();
+				this.styleElement = document.createElement('style');
+				this.styleElement.id = 'moc-system-plugin-styles';
+				this.styleElement.textContent = combinedStyles;
+				document.head.appendChild(this.styleElement);
+			}
 		} catch (error) {
 			// Style errors are non-critical - log but don't disrupt functionality
 			if (isMOCSystemError(error)) {
@@ -264,30 +284,60 @@ export default class MOCSystemPlugin extends Plugin {
 	}
 
 	/**
-	 * Generates CSS for individual MOC folder colors
+	 * Generates CSS for individual MOC folder colors with caching
 	 */
 	private async generateMOCColorStyles(): Promise<string> {
+		// Performance optimization: Only refresh cache if MOCs have changed
 		const allMOCs = await this.getAllMOCs();
-		const colorStyles: string[] = [];
+		const currentTime = Date.now();
+		const needsCacheRefresh = currentTime - this.lastMOCUpdate > 5000; // Refresh every 5 seconds
+		
+		if (needsCacheRefresh) {
+			// Clear and rebuild cache
+			this.mocMetadataCache.clear();
+			this.lastMOCUpdate = currentTime;
+		}
 
-		for (const moc of allMOCs) {
+		const colorStyles: string[] = [];
+		
+		// Batch process all MOCs
+		const processPromises = allMOCs.map(async (moc) => {
 			try {
-				const frontmatter = this.app.metadataCache.getFileCache(moc)?.frontmatter;
-				const lightColor = getFrontmatterValue(frontmatter, 'light-color', null);
-				const darkColor = getFrontmatterValue(frontmatter, 'dark-color', null);
+				// Check cache first
+				let metadata = this.mocMetadataCache.get(moc.path);
 				
-				if (lightColor && darkColor && moc.parent) {
+				if (!metadata) {
+					// Fetch and cache metadata
+					const frontmatter = this.app.metadataCache.getFileCache(moc)?.frontmatter;
+					metadata = {
+						lightColor: getFrontmatterValue(frontmatter, 'light-color', null),
+						darkColor: getFrontmatterValue(frontmatter, 'dark-color', null)
+					};
+					this.mocMetadataCache.set(moc.path, metadata);
+				}
+				
+				if (metadata.lightColor && metadata.darkColor && moc.parent) {
 					const escapedPath = this.escapeForCSS(moc.parent.path);
-					
-					colorStyles.push(
-						this.generateThemeCSS(escapedPath, lightColor, 'light'),
-						this.generateThemeCSS(escapedPath, darkColor, 'dark')
-					);
+					return [
+						this.generateThemeCSS(escapedPath, metadata.lightColor, 'light'),
+						this.generateThemeCSS(escapedPath, metadata.darkColor, 'dark')
+					];
 				}
 			} catch (error) {
 				console.warn(`Failed to generate styles for MOC: ${moc.path}`, error);
 			}
-		}
+			return null;
+		});
+		
+		// Wait for all processing to complete
+		const results = await Promise.all(processPromises);
+		
+		// Flatten results and filter out nulls
+		results.forEach(result => {
+			if (result) {
+				colorStyles.push(...result);
+			}
+		});
 		
 		return colorStyles.join('\n');
 	}
@@ -402,6 +452,10 @@ ${selector} .nav-folder-collapse-indicator {
 			const filePath = `${folderName}/${folderName}.md`;
 			const file = await this.createFileWithContent(filePath, frontmatter);
 			
+			// Create default content as per Phase 4 requirements
+			await this.createResource(file, 'Quick Notes');
+			await this.createPrompt(file, 'General Questions');
+			
 			// Open file and update styles
 			await this.openFileAndNotify(file, `Created MOC: ${mocName}`);
 			this.debouncedStyleUpdate();
@@ -438,6 +492,10 @@ ${selector} .nav-folder-collapse-indicator {
 				frontmatter
 			);
 			
+			// Create default content for sub-MOCs as well
+			await this.createResource(file, 'Quick Notes');
+			await this.createPrompt(file, 'General Questions');
+			
 			await this.addToMOCSection(parentMOC, 'MOCs', file);
 			new Notice(`Created sub-MOC: ${mocName}`);
 			this.debouncedStyleUpdate();
@@ -459,21 +517,8 @@ ${selector} .nav-folder-collapse-indicator {
 			'Enter MOC name...',
 			async (name: string) => {
 				try {
-					// Create the MOC
-					const mocFile = await this.createMOC(name);
-					
-					// Create default content as per Phase 2 requirements
-					const mocFolder = mocFile.parent;
-					if (mocFolder) {
-						// Create default resource: Quick Notes.md
-						await this.createResource(mocFile, 'Quick Notes');
-						
-						// Create default prompt: General Questions v1.md
-						await this.createPrompt(mocFile, 'General Questions');
-					}
-					
-					// Notify user
-					new Notice(`Created MOC with default content: ${name}`);
+					// Create the MOC (default content now created automatically)
+					await this.createMOC(name);
 				} catch (error) {
 					console.error('Quick create MOC error:', error);
 					new Notice(`Failed to create MOC: ${error.message}`);
@@ -1037,29 +1082,41 @@ ${selector} .nav-folder-collapse-indicator {
 		const pluginSections: { name: SectionType, content: string[] }[] = [];
 		const otherContentLines: string[] = [];
 		const sectionIndices = new Map<SectionType, number>();
-		const consumedLineIndices = new Set<number>();
-
-		// Extract all known plugin sections in order
+		
+		// Performance optimization: Build section map in single pass
+		const sectionMap = new Map<string, { start: number, end: number }>();
+		
+		// Single pass to find all sections
+		for (let i = frontmatterEnd; i < lines.length; i++) {
+			const line = lines[i].trim();
+			if (line.startsWith('## ')) {
+				const sectionName = line.substring(3);
+				const nextSectionIndex = lines.findIndex((l, idx) => 
+					idx > i && l.trim().startsWith('## ')
+				);
+				sectionMap.set(sectionName, {
+					start: i,
+					end: nextSectionIndex === -1 ? lines.length : nextSectionIndex
+				});
+			}
+		}
+		
+		// Extract plugin sections using the map
+		const consumedRanges: [number, number][] = [];
+		
 		for (const sectionName of CONFIG.SECTION_ORDER) {
-			const header = `## ${sectionName}`;
-			const startIndex = lines.findIndex((line, i) => 
-				i >= frontmatterEnd && line.trim() === header
-			);
-
-			if (startIndex !== -1) {
-				const endIndex = this.findSectionEnd(lines, startIndex);
-				const sectionContent = lines.slice(startIndex, endIndex);
+			const sectionInfo = sectionMap.get(sectionName);
+			if (sectionInfo) {
+				const sectionContent = lines.slice(sectionInfo.start, sectionInfo.end);
 				pluginSections.push({ name: sectionName, content: sectionContent });
-
-				for (let i = startIndex; i < endIndex; i++) {
-					consumedLineIndices.add(i);
-				}
+				consumedRanges.push([sectionInfo.start, sectionInfo.end]);
 			}
 		}
 
-		// Collect other content
+		// Collect other content - optimized to check ranges instead of individual indices
 		for (let i = frontmatterEnd; i < lines.length; i++) {
-			if (!consumedLineIndices.has(i)) {
+			const isConsumed = consumedRanges.some(([start, end]) => i >= start && i < end);
+			if (!isConsumed) {
 				otherContentLines.push(lines[i]);
 			}
 		}
@@ -2050,6 +2107,78 @@ ${selector} .nav-folder-collapse-indicator {
 		const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter;
 		const noteType = getFrontmatterValue(frontmatter, 'note-type', null as string | null);
 		return noteType !== null && ['moc', 'note', 'resource', 'prompt'].includes(noteType);
+	}
+
+	/**
+	 * Smart emoji detection for automatic file type determination
+	 * Part of Phase 4: Polish & Enhancement
+	 */
+	private async handleSmartEmojiDetection(file: TFile): Promise<void> {
+		try {
+			const fileName = file.basename;
+			
+			// Check if file is in a MOC folder
+			const parentFolder = file.parent;
+			if (!parentFolder) {
+				return;
+			}
+			
+			// Find the parent MOC
+			const parentMOC = await this.findParentMOC(file);
+			if (!parentMOC) {
+				return;
+			}
+			
+			// Check for resource emoji
+			if (fileName.startsWith('📚')) {
+				// Add resource frontmatter
+				const frontmatter = this.buildFrontmatter({
+					'note-type': 'resource'
+				});
+				
+				// Read current content
+				const content = await this.app.vault.read(file);
+				
+				// Only update if no frontmatter exists
+				if (!content.startsWith('---')) {
+					await this.app.vault.modify(file, frontmatter + '\n' + content);
+					
+					// Add to MOC's Resources section
+					await this.addToMOCSection(parentMOC, 'Resources', file);
+					new Notice(`Auto-detected resource: ${fileName}`);
+				}
+			}
+			// Check for prompt emoji
+			else if (fileName.startsWith('🤖')) {
+				// Extract version number if present
+				const versionMatch = fileName.match(/v(\d+)/);
+				const iteration = versionMatch ? parseInt(versionMatch[1]) : 1;
+				const promptName = fileName.replace(/🤖\s*/, '').replace(/\s*v\d+.*$/, '').trim();
+				
+				// Add prompt frontmatter
+				const frontmatter = this.buildFrontmatter({
+					'note-type': 'prompt',
+					'prompt-group': promptName,
+					'iteration': iteration,
+					'llm-links': []
+				});
+				
+				// Read current content
+				const content = await this.app.vault.read(file);
+				
+				// Only update if no frontmatter exists
+				if (!content.startsWith('---')) {
+					await this.app.vault.modify(file, frontmatter + '\n' + content);
+					
+					// Add to MOC's Prompts section
+					await this.addPromptToMOC(parentMOC, promptName, file);
+					new Notice(`Auto-detected prompt: ${fileName}`);
+				}
+			}
+		} catch (error) {
+			console.error('Smart emoji detection error:', error);
+			// Don't show notice for auto-detection errors to avoid spam
+		}
 	}
 
 	// =================================================================================
