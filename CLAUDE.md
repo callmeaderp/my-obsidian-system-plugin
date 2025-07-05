@@ -4,9 +4,10 @@
 This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) system for note organization. The plugin is currently stable and fully functional.
 
 ## Current State
-- **Status**: Production-ready, all features implemented
+- **Status**: Production-ready, undergoing redesign to reduce friction
 - **Last major refactor**: Comprehensive code cleanup completed
-- **Known issues**: None currently
+- **Active development**: Major redesign planned - see PLUGIN_REDESIGN_PLAN.md
+- **Known issues**: Modal fatigue and workflow rigidity (being addressed in redesign)
 
 ## File Inventory
 
@@ -77,13 +78,18 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `light-color/dark-color`: Computed theme colors
 - `root-moc-color`: Boolean flag for root MOCs
 
-### File Naming Patterns
+### File Naming Patterns (Current)
 - MOCs: `[emoji] [name] MOC.md`
 - Notes: `📝 [name].md`
 - Resources: `📁 [name].md`
 - Prompts: `🤖 [name].md` (hub) / `🤖 [name] v[N].md` (iterations)
 
-### Folder Structure
+### File Naming Patterns (Planned Redesign)
+- MOCs: `🎯 [name] MOC.md` (standardized emoji)
+- Resources: `📚 [name].md` (merges notes + resources)
+- Prompts: `🤖 [name] v[N].md` (no separate hub file)
+
+### Folder Structure (Current)
 ```
 [emoji] [MOC Name] MOC/
 ├── [emoji] [MOC Name] MOC.md
@@ -95,6 +101,18 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
         ├── 🤖 [Prompt Name] v1.md
         └── 🤖 [Prompt Name] v2 - description.md
 ```
+
+### Folder Structure (Planned Redesign)
+```
+[emoji] [MOC Name] MOC/
+├── 🎯 [MOC Name] MOC.md
+├── 📚 Quick Notes.md (default resource)
+├── 📚 [Resource Name].md
+├── 🤖 General Questions v1.md (default prompt)
+├── 🤖 [Prompt Name] v1.md
+└── 🤖 [Prompt Name] v2 - description.md
+```
+Note: Flat structure, no subfolders, prompt hubs eliminated
 
 ## Technical Context
 
@@ -121,7 +139,13 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - No other special requirements
 
 ## Current Issues
-None - plugin is stable and all features are working correctly.
+- Modal fatigue from 11 different modals
+- Workflow rigidity requiring too many clicks
+- Artificial distinctions between notes and resources
+- Prompt hub pattern adds unnecessary complexity
+- Subfolder structure creates barriers to content
+
+See PLUGIN_REDESIGN_PLAN.md for detailed solutions.
 
 ## Temporary Workarounds
 None currently in place.

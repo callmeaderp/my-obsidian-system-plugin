@@ -14,13 +14,13 @@ export type PluginSettings = Record<string, never>;
  * Section types that organize content within MOCs
  * These sections appear in a specific order to maintain consistency
  */
-export type SectionType = 'MOCs' | 'Notes' | 'Resources' | 'Prompts';
+export type SectionType = 'MOCs' | 'Resources' | 'Prompts';
 
 /**
  * Note types supported by the plugin
  * Each type has specific behaviors and organizational patterns
  */
-export type NoteType = 'moc' | 'note' | 'resource' | 'prompt';
+export type NoteType = 'moc' | 'resource' | 'prompt';
 
 /**
  * Configuration for file creation

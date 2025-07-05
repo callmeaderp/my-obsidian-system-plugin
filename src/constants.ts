@@ -16,29 +16,24 @@ export const DEFAULT_SETTINGS = {};
  */
 export const CONFIG = {
 	/**
-	 * Folder names for MOC organization
-	 * These folders are automatically created within each MOC
+	 * Folder names for MOC organization (kept for backward compatibility)
+	 * No longer used in flat structure
 	 */
-	FOLDERS: {
-		Notes: 'Notes',
-		Resources: 'Resources',
-		Prompts: 'Prompts'
-	} as const,
+	FOLDERS: {} as const,
 
 	/**
 	 * Order in which sections appear in MOC files
 	 * Ensures consistent organization across all MOCs
 	 */
-	SECTION_ORDER: ['MOCs', 'Notes', 'Resources', 'Prompts'] as const,
+	SECTION_ORDER: ['MOCs', 'Resources', 'Prompts'] as const,
 
 	/**
 	 * Configuration for each note type
 	 * Defines visual identifiers and organizational rules
 	 */
 	NOTE_TYPES: {
-		MOCs: { emoji: '🔵' },
-		Notes: { emoji: '📝' },
-		Resources: { emoji: '📁' },
+		MOCs: { emoji: '🎯' },
+		Resources: { emoji: '📚' },
 		Prompts: { emoji: '🤖' }
 	} as const,
 

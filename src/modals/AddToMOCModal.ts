@@ -26,14 +26,9 @@ export class AddToMOCModal extends BaseModal {
 				description: 'Child MOC for sub-topics'
 			},
 			{ 
-				label: 'Note', 
-				action: async (name: string) => { await this.plugin.createNote(this.moc, name); },
-				description: 'Regular content note'
-			},
-			{ 
 				label: 'Resource', 
 				action: async (name: string) => { await this.plugin.createResource(this.moc, name); },
-				description: 'Reference materials'
+				description: 'Content, notes, and reference materials'
 			},
 			{ 
 				label: 'Prompt', 

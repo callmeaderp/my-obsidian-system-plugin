@@ -351,8 +351,8 @@ ${selector} .nav-folder-collapse-indicator {
 			const sanitizedName = sanitizeInput(name, 'MOC name');
 			const mocName = ensureMOCSuffix(sanitizedName);
 			
-			// Generate unique visual identifier and color
-			const emoji = getRandomEmoji();
+			// Generate visual identifier and color
+			const emoji = CONFIG.NOTE_TYPES.MOCs.emoji;
 			const colorInfo = generateRandomColor();
 			const folderName = `${emoji} ${mocName}`;
 			
@@ -389,7 +389,7 @@ ${selector} .nav-folder-collapse-indicator {
 			const sanitizedName = sanitizeInput(name, 'Sub-MOC name');
 			const mocName = ensureMOCSuffix(sanitizedName);
 			
-			const emoji = getRandomEmoji();
+			const emoji = CONFIG.NOTE_TYPES.MOCs.emoji;
 			const colorInfo = generateRandomColor();
 			const parentPath = parentMOC.parent?.path || '';
 			const folderName = `${parentPath}/${emoji} ${mocName}`;
@@ -422,10 +422,6 @@ ${selector} .nav-folder-collapse-indicator {
 	// =================================================================================
 
 	// Convenience methods for specific file types
-	async createNote(parentMOC: TFile, name: string): Promise<TFile> {
-		return this.createFile({ name, parentMOC, type: 'note' });
-	}
-
 	async createResource(parentMOC: TFile, name: string): Promise<TFile> {
 		return this.createFile({ name, parentMOC, type: 'resource' });
 	}
@@ -444,28 +440,22 @@ ${selector} .nav-folder-collapse-indicator {
 			const fileConfigs = {
 				moc: { 
 					type: 'moc' as const, 
-					emoji: getRandomEmoji(), 
+					emoji: CONFIG.NOTE_TYPES.MOCs.emoji, 
 					folder: '', 
 					suffix: 'MOC', 
 					createSubfolder: true 
 				},
-				note: { 
-					type: 'note' as const, 
-					emoji: CONFIG.NOTE_TYPES.Notes.emoji, 
-					folder: CONFIG.FOLDERS.Notes,
-					createSubfolder: false
-				},
 				resource: { 
 					type: 'resource' as const, 
 					emoji: CONFIG.NOTE_TYPES.Resources.emoji, 
-					folder: CONFIG.FOLDERS.Resources,
+					folder: '', // Flat structure - no subfolder
 					createSubfolder: false
 				},
 				prompt: { 
 					type: 'prompt' as const, 
 					emoji: CONFIG.NOTE_TYPES.Prompts.emoji, 
-					folder: CONFIG.FOLDERS.Prompts, 
-					createSubfolder: true 
+					folder: '', // Flat structure - no subfolder
+					createSubfolder: false // Changed to false for flat structure
 				}
 			};
 
@@ -502,24 +492,17 @@ ${selector} .nav-folder-collapse-indicator {
 	): Promise<TFile> {
 		try {
 			const parentPath = config.parentMOC?.parent?.path || '';
-			const promptsFolder = `${parentPath}/${CONFIG.FOLDERS.Prompts}`;
-			const promptSubfolder = `${promptsFolder}/${config.name}`;
 			const iterationName = `${CONFIG.NOTE_TYPES.Prompts.emoji} ${config.name} v1`;
 
-			// Ensure iteration subfolder exists
-			if (!this.app.vault.getAbstractFileByPath(promptSubfolder)) {
-				await this.app.vault.createFolder(promptSubfolder);
-			}
-
-			// Create hub with standard structure
+			// Create hub with standard structure (temporary - will be removed in Phase 3)
 			const hubContent = `${baseFrontmatter}\n# ${config.name}\n\n## Iterations\n\n- [[${iterationName}]]\n\n## LLM Links\n\n\`\`\`llm-links\n\n\`\`\`\n`;
 			const hubFile = await this.createFileWithContent(
-				`${promptsFolder}/${CONFIG.NOTE_TYPES.Prompts.emoji} ${config.name}.md`, 
+				`${parentPath}/${CONFIG.NOTE_TYPES.Prompts.emoji} ${config.name}.md`, 
 				hubContent
 			);
 			
-			// Create first iteration
-			await this.createFileWithContent(`${promptSubfolder}/${iterationName}.md`, baseFrontmatter);
+			// Create first iteration in flat structure
+			await this.createFileWithContent(`${parentPath}/${iterationName}.md`, baseFrontmatter);
 			
 			if (config.parentMOC) {
 				await this.addToMOCSection(config.parentMOC, 'Prompts', hubFile);
@@ -584,7 +567,6 @@ ${selector} .nav-folder-collapse-indicator {
 	private typeToSection(type: NoteType): SectionType {
 		const mapping: Record<NoteType, SectionType> = {
 			moc: 'MOCs', 
-			note: 'Notes', 
 			resource: 'Resources', 
 			prompt: 'Prompts'
 		};
@@ -617,7 +599,7 @@ ${selector} .nav-folder-collapse-indicator {
 	}
 
 	/**
-	 * Ensures complete MOC folder structure exists
+	 * Ensures MOC folder exists
 	 */
 	async ensureMOCFolderStructure(mocFolderPath: string) {
 		try {
@@ -625,24 +607,10 @@ ${selector} .nav-folder-collapse-indicator {
 			if (!this.app.vault.getAbstractFileByPath(mocFolderPath)) {
 				await this.app.vault.createFolder(mocFolderPath);
 			}
-			
-			// Create standard subfolders
-			for (const folder of Object.values(CONFIG.FOLDERS)) {
-				const subfolderPath = `${mocFolderPath}/${folder}`;
-				if (!this.app.vault.getAbstractFileByPath(subfolderPath)) {
-					try {
-						await this.app.vault.createFolder(subfolderPath);
-					} catch (err: any) {
-						// Ignore "already exists" errors that can happen in race conditions
-						if (!err.message?.includes('Folder already exists')) {
-							throw err;
-						}
-					}
-				}
-			}
+			// No subfolders in flat structure
 		} catch (error) {
 			throw new FileSystemError(
-				`Failed to create MOC folder structure: ${mocFolderPath}`, 
+				`Failed to create MOC folder: ${mocFolderPath}`, 
 				'create', 
 				mocFolderPath
 			);
@@ -922,13 +890,11 @@ ${selector} .nav-folder-collapse-indicator {
 				return;
 			}
 
-			// Find the hub file and iteration folder structure
-			const iterationFolder = file.parent;
-			const promptsFolder = iterationFolder?.parent;
-			const mocFolder = promptsFolder?.parent;
+			// Find the hub file in flat structure
+			const mocFolder = file.parent;
 			
-			if (!iterationFolder || !promptsFolder || !mocFolder) {
-				new Notice('Could not find prompt structure. File must be in a prompt iteration folder.');
+			if (!mocFolder) {
+				new Notice('Could not find MOC folder.');
 				return;
 			}
 
@@ -939,14 +905,13 @@ ${selector} .nav-folder-collapse-indicator {
 			const hubFileName = `${iterationBaseName}.md`;
 			
 			
-			const hubFile = promptsFolder.children?.find(child => 
+			const hubFile = mocFolder.children?.find(child => 
 				child instanceof TFile && 
-				child.name === hubFileName &&
-				child.parent?.path === promptsFolder.path // Ensure it's directly in Prompts folder, not a subfolder
+				child.name === hubFileName
 			) as TFile;
 
 			if (!hubFile) {
-				new Notice(`Could not find prompt hub file "${hubFileName}" in ${promptsFolder.path}`);
+				new Notice(`Could not find prompt hub file "${hubFileName}" in ${mocFolder.path}`);
 				return;
 			}
 
@@ -965,8 +930,8 @@ ${selector} .nav-folder-collapse-indicator {
 					// Read current iteration content
 					const currentContent = await this.app.vault.read(file);
 					
-					// Create new iteration file in the same folder
-					const newIterationPath = `${iterationFolder.path}/${newIterationName}.md`;
+					// Create new iteration file in the same folder (flat structure)
+					const newIterationPath = `${mocFolder.path}/${newIterationName}.md`;
 					const newFile = await this.createFileWithContent(newIterationPath, currentContent);
 					
 					// Update hub file to include new iteration
@@ -1571,7 +1536,7 @@ ${selector} .nav-folder-collapse-indicator {
 		let emoji = getRandomEmoji();
 		
 		// Use standard emojis for known types
-		if (noteType === 'note') emoji = CONFIG.NOTE_TYPES.Notes.emoji;
+		if (noteType === 'moc') emoji = CONFIG.NOTE_TYPES.MOCs.emoji;
 		else if (noteType === 'resource') emoji = CONFIG.NOTE_TYPES.Resources.emoji;
 		else if (noteType === 'prompt') emoji = CONFIG.NOTE_TYPES.Prompts.emoji;
 		
@@ -1632,26 +1597,19 @@ ${selector} .nav-folder-collapse-indicator {
 	}
 
 	/**
-	 * Detects the note type based on file location and characteristics
+	 * Detects the note type based on file characteristics
 	 */
 	private detectNoteType(file: TFile): string {
 		// Check if it's a MOC by existing logic
 		if (this.isMOC(file)) return 'moc';
 		
-		// Check by folder location
-		const path = file.path;
-		if (path.includes('/Notes/')) return 'note';
-		if (path.includes('/Resources/')) return 'resource';
-		if (path.includes('/Prompts/')) return 'prompt';
-		
-		// Check by file characteristics
+		// Check by file characteristics (flat structure - no folder checking)
 		if (file.basename.endsWith(' MOC')) return 'moc';
-		if (file.name.startsWith(CONFIG.NOTE_TYPES.Notes.emoji)) return 'note';
 		if (file.name.startsWith(CONFIG.NOTE_TYPES.Resources.emoji)) return 'resource';
 		if (file.name.startsWith(CONFIG.NOTE_TYPES.Prompts.emoji)) return 'prompt';
 		
 		// Default fallback
-		return 'note';
+		return 'resource';
 	}
 
 	async cleanupMOCSystem() {
@@ -1761,30 +1719,7 @@ ${selector} .nav-folder-collapse-indicator {
 					console.log(`Cleaned up empty folder: ${folder.path}`);
 				}
 			}
-			
-			// Also check for empty prompt iteration folders
-			const promptsFolder = parentFolder.children?.find(
-				child => child instanceof TFolder && child.name === CONFIG.FOLDERS.Prompts
-			) as TFolder;
-			
-			if (promptsFolder) {
-				const iterationFolders = promptsFolder.children?.filter(
-					child => child instanceof TFolder
-				) as TFolder[];
-				
-				for (const iterFolder of iterationFolders || []) {
-					if (this.isFolderEmpty(iterFolder)) {
-						await this.app.vault.delete(iterFolder);
-						console.log(`Cleaned up empty iteration folder: ${iterFolder.path}`);
-					}
-				}
-				
-				// Check if Prompts folder itself is now empty
-				if (this.isFolderEmpty(promptsFolder)) {
-					await this.app.vault.delete(promptsFolder);
-					console.log(`Cleaned up empty prompts folder: ${promptsFolder.path}`);
-				}
-			}
+			// No prompt subfolders to check in flat structure
 		} catch (error) {
 			console.error('Failed to cleanup empty folders:', error);
 		}
