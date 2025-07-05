@@ -154,7 +154,7 @@ export default class MOCSystemPlugin extends Plugin {
 			{ 
 				id: 'open-llm-links', 
 				name: 'Open all LLM links', 
-				condition: (f: TFile) => this.isPromptHub(f), 
+				condition: (f: TFile) => this.isPromptIteration(f), 
 				action: (f: TFile) => this.openLLMLinks(f) 
 			}
 		];
@@ -573,6 +573,18 @@ ${selector} .nav-folder-collapse-indicator {
 			return;
 		}
 		
+		// Get metadata from current iteration
+		const metadata = this.app.metadataCache.getFileCache(activeFile);
+		const frontmatter = metadata?.frontmatter;
+		
+		if (!frontmatter || !frontmatter['prompt-group']) {
+			new Notice('Could not find prompt-group in frontmatter. Please ensure the file has proper prompt metadata.');
+			return;
+		}
+		
+		const promptGroup = frontmatter['prompt-group'];
+		const llmLinks = frontmatter['llm-links'] || [];
+		
 		// Quick input for optional description
 		const modal = new QuickInputModal(
 			this.app,
@@ -586,27 +598,38 @@ ${selector} .nav-folder-collapse-indicator {
 					}
 					
 					// Build new iteration filename
-					const baseIterationName = activeFile.basename.replace(/ v\d+.*$/, '');
-					let newIterationName = `${baseIterationName} v${currentVersion + 1}`;
+					let newIterationName = `${CONFIG.NOTE_TYPES.Prompts.emoji} ${promptGroup} v${currentVersion + 1}`;
 					if (description.trim()) {
 						const sanitizedDescription = sanitizeInput(description, 'iteration description');
 						newIterationName += ` - ${sanitizedDescription}`;
 					}
 					
-					// Read current content and create new file
+					// Read current content (without frontmatter)
 					const currentContent = await this.app.vault.read(activeFile);
-					const newIterationPath = `${mocFolder.path}/${newIterationName}.md`;
-					const newFile = await this.createFileWithContent(newIterationPath, currentContent);
+					const contentWithoutFrontmatter = this.stripFrontmatter(currentContent);
 					
-					// Find and update hub file
-					const iterationBaseName = activeFile.basename.replace(/ v\d+.*$/, '');
-					const hubFileName = `${iterationBaseName}.md`;
-					const hubFile = mocFolder.children?.find(child => 
-						child instanceof TFile && child.name === hubFileName
+					// Build new frontmatter with updated iteration number and synced llm-links
+					const newFrontmatter = this.buildFrontmatter({
+						'note-type': 'prompt',
+						'prompt-group': promptGroup,
+						'iteration': currentVersion + 1,
+						'llm-links': llmLinks
+					});
+					
+					// Create new iteration file
+					const newIterationPath = `${mocFolder.path}/${newIterationName}.md`;
+					const newFile = await this.createFileWithContent(
+						newIterationPath, 
+						newFrontmatter + contentWithoutFrontmatter
+					);
+					
+					// Find the MOC file and update it
+					const mocFile = mocFolder.children?.find(
+						child => child instanceof TFile && this.isMOC(child)
 					) as TFile;
 					
-					if (hubFile) {
-						await this.addIterationToHub(hubFile, newFile);
+					if (mocFile) {
+						await this.addPromptToMOC(mocFile, promptGroup, newFile);
 					}
 					
 					// Open the new iteration
@@ -668,14 +691,32 @@ ${selector} .nav-folder-collapse-indicator {
 
 			const fileConfig = fileConfigs[config.type];
 			const parentPath = config.parentMOC?.parent?.path || '';
+			
+			// Phase 3: Handle prompts specially - create v1 directly
+			if (config.type === 'prompt') {
+				const promptName = `${CONFIG.NOTE_TYPES.Prompts.emoji} ${sanitizedName} v1`;
+				const promptPath = normalizePath(`${parentPath}/${promptName}.md`);
+				const promptFrontmatter = this.buildFrontmatter({
+					'note-type': 'prompt',
+					'prompt-group': sanitizedName,
+					'iteration': 1,
+					'llm-links': []
+				});
+				
+				const file = await this.createFileWithContent(promptPath, promptFrontmatter);
+				
+				if (config.parentMOC) {
+					// Add to MOC with new nested structure
+					await this.addPromptToMOC(config.parentMOC, sanitizedName, file);
+				}
+				
+				new Notice(`Created prompt: ${sanitizedName} v1`);
+				return file;
+			}
+			
+			// Regular file creation for MOCs and resources
 			const fileName = this.buildFileName(sanitizedName, fileConfig, parentPath);
 			const frontmatter = this.buildFrontmatter({ 'note-type': config.type });
-
-			// Handle special case for prompts (creates hub + iteration)
-			if (fileConfig.createSubfolder && config.type === 'prompt') {
-				return this.createPromptWithIterations(config, fileName, frontmatter);
-			}
-
 			const file = await this.createFileWithContent(fileName, frontmatter);
 			
 			if (config.parentMOC) {
@@ -689,39 +730,6 @@ ${selector} .nav-folder-collapse-indicator {
 		}
 	}
 
-	/**
-	 * Creates prompt hub with iteration tracking
-	 */
-	private async createPromptWithIterations(
-		config: CreateConfig, 
-		hubFileName: string, 
-		baseFrontmatter: string
-	): Promise<TFile> {
-		try {
-			const parentPath = config.parentMOC?.parent?.path || '';
-			const iterationName = `${CONFIG.NOTE_TYPES.Prompts.emoji} ${config.name} v1`;
-
-			// Create hub with standard structure (temporary - will be removed in Phase 3)
-			const hubContent = `${baseFrontmatter}\n# ${config.name}\n\n## Iterations\n\n- [[${iterationName}]]\n\n## LLM Links\n\n\`\`\`llm-links\n\n\`\`\`\n`;
-			const hubFile = await this.createFileWithContent(
-				`${parentPath}/${CONFIG.NOTE_TYPES.Prompts.emoji} ${config.name}.md`, 
-				hubContent
-			);
-			
-			// Create first iteration in flat structure
-			await this.createFileWithContent(`${parentPath}/${iterationName}.md`, baseFrontmatter);
-			
-			if (config.parentMOC) {
-				await this.addToMOCSection(config.parentMOC, 'Prompts', hubFile);
-			}
-			
-			new Notice(`Created prompt: ${config.name}`);
-			this.debouncedStyleUpdate();
-			return hubFile;
-		} catch (error) {
-			throw this.wrapError(error, 'Failed to create prompt with iterations', 'create', config.name || '');
-		}
-	}
 
 	// =================================================================================
 	// UTILITY METHODS FOR FILE CREATION
@@ -1084,8 +1092,140 @@ ${selector} .nav-folder-collapse-indicator {
 		return lines.length;
 	}
 
+	/**
+	 * Adds a prompt to MOC with nested iteration structure (Phase 3)
+	 */
+	async addPromptToMOC(moc: TFile, promptGroup: string, iterationFile: TFile) {
+		try {
+			let content = await this.app.vault.read(moc);
+			let lines = content.split('\n');
+			
+			// Find frontmatter end
+			const frontmatterEnd = this.findFrontmatterEnd(lines);
+			
+			// Reorganize content and get section indices
+			const { reorganizedLines, sectionIndices } = this.reorganizeContentForPluginSections(
+				lines, 
+				frontmatterEnd
+			);
+			
+			let promptsSectionIndex = sectionIndices.get('Prompts');
+			
+			if (promptsSectionIndex === undefined) {
+				// Create Prompts section if it doesn't exist
+				this.insertNewPromptsSection(reorganizedLines, promptGroup, iterationFile, frontmatterEnd, sectionIndices);
+			} else {
+				// Add to existing Prompts section with nested structure
+				this.insertPromptInSection(reorganizedLines, promptsSectionIndex, promptGroup, iterationFile);
+			}
+			
+			await this.app.vault.modify(moc, reorganizedLines.join('\n'));
+		} catch (error) {
+			throw this.wrapError(error, 'Failed to add prompt to MOC', 'update', moc.path);
+		}
+	}
+
+	/**
+	 * Inserts a new Prompts section with the first prompt group
+	 */
+	private insertNewPromptsSection(
+		lines: string[], 
+		promptGroup: string,
+		iterationFile: TFile,
+		frontmatterEnd: number,
+		sectionIndices: Map<SectionType, number>
+	) {
+		let insertIndex = frontmatterEnd;
+		const promptsOrderIndex = CONFIG.SECTION_ORDER.indexOf('Prompts');
+		
+		// Find where to insert based on section order
+		for (let i = promptsOrderIndex + 1; i < CONFIG.SECTION_ORDER.length; i++) {
+			const nextSection = CONFIG.SECTION_ORDER[i];
+			if (sectionIndices.has(nextSection)) {
+				insertIndex = sectionIndices.get(nextSection)!;
+				break;
+			}
+		}
+		
+		if (insertIndex === frontmatterEnd && sectionIndices.size > 0) {
+			const lastSectionIndex = Math.max(...Array.from(sectionIndices.values()));
+			insertIndex = this.findSectionEnd(lines, lastSectionIndex);
+		}
+		
+		const newSectionContent = [
+			`## Prompts`,
+			``,
+			`- ${CONFIG.NOTE_TYPES.Prompts.emoji} ${promptGroup}`,
+			`  - [[${iterationFile.basename}]]`,
+			``
+		];
+		lines.splice(insertIndex, 0, ...newSectionContent);
+	}
+
+	/**
+	 * Inserts a prompt iteration in the existing Prompts section
+	 */
+	private insertPromptInSection(
+		lines: string[], 
+		sectionIndex: number,
+		promptGroup: string,
+		iterationFile: TFile
+	) {
+		// Find where this prompt group exists or where to add it
+		let groupLineIndex = -1;
+		let insertIndex = sectionIndex + 1;
+		
+		// Skip empty lines after section header
+		while (insertIndex < lines.length && lines[insertIndex].trim() === '') {
+			insertIndex++;
+		}
+		
+		// Search for existing prompt group
+		for (let i = insertIndex; i < lines.length; i++) {
+			const line = lines[i].trim();
+			
+			// Stop at next section
+			if (line.startsWith('## ')) break;
+			
+			// Check if this is our prompt group
+			if (line === `- ${CONFIG.NOTE_TYPES.Prompts.emoji} ${promptGroup}`) {
+				groupLineIndex = i;
+				break;
+			}
+		}
+		
+		if (groupLineIndex === -1) {
+			// Prompt group doesn't exist, add it
+			lines.splice(insertIndex, 0, 
+				`- ${CONFIG.NOTE_TYPES.Prompts.emoji} ${promptGroup}`,
+				`  - [[${iterationFile.basename}]]`
+			);
+		} else {
+			// Prompt group exists, find where to add the iteration
+			let iterationInsertIndex = groupLineIndex + 1;
+			
+			// Find the last iteration of this group
+			while (iterationInsertIndex < lines.length) {
+				const line = lines[iterationInsertIndex];
+				
+				// Stop if we hit a non-indented line or next section
+				if (line.trim() && !line.startsWith('  ')) break;
+				
+				// If it's an iteration line, move past it
+				if (line.trim().startsWith('- [[')) {
+					iterationInsertIndex++;
+				} else {
+					break;
+				}
+			}
+			
+			// Insert the new iteration
+			lines.splice(iterationInsertIndex, 0, `  - [[${iterationFile.basename}]]`);
+		}
+	}
+
 	// =================================================================================
-	// PROMPT MANAGEMENT SYSTEM (Simplified)
+	// PROMPT MANAGEMENT SYSTEM (Phase 3 - No Hub Files)
 	// =================================================================================
 
 	async duplicatePromptIteration(file: TFile) {
@@ -1097,52 +1237,62 @@ ${selector} .nav-folder-collapse-indicator {
 				return;
 			}
 
-			// Find the hub file in flat structure
 			const mocFolder = file.parent;
-			
 			if (!mocFolder) {
 				new Notice('Could not find MOC folder.');
 				return;
 			}
 
-			// Extract the prompt base name from the iteration file name
-			// For file "🤖 Prompt Name v1.md" or "🤖 Prompt Name v2 - description.md"
-			// We want to find hub file "🤖 Prompt Name.md"
-			const iterationBaseName = file.basename.replace(/ v\d+.*$/, ''); // Remove version and everything after
-			const hubFileName = `${iterationBaseName}.md`;
+			// Get metadata from current iteration
+			const metadata = this.app.metadataCache.getFileCache(file);
+			const frontmatter = metadata?.frontmatter;
 			
-			
-			const hubFile = mocFolder.children?.find(child => 
-				child instanceof TFile && 
-				child.name === hubFileName
-			) as TFile;
-
-			if (!hubFile) {
-				new Notice(`Could not find prompt hub file "${hubFileName}" in ${mocFolder.path}`);
+			if (!frontmatter || !frontmatter['prompt-group']) {
+				new Notice('Could not find prompt-group in frontmatter. Please ensure the file has proper prompt metadata.');
 				return;
 			}
+
+			const promptGroup = frontmatter['prompt-group'];
+			const llmLinks = frontmatter['llm-links'] || [];
 
 			new PromptDescriptionModal(this.app, async (description: string) => {
 				try {
 					const nextVersion = currentVersion + 1;
-					const baseIterationName = file.basename.replace(/ v\d+$/, '');
 					
 					// Build new iteration filename with optional description
-					let newIterationName = `${baseIterationName} v${nextVersion}`;
+					let newIterationName = `${CONFIG.NOTE_TYPES.Prompts.emoji} ${promptGroup} v${nextVersion}`;
 					if (description.trim()) {
 						const sanitizedDescription = sanitizeInput(description, 'iteration description');
 						newIterationName += ` - ${sanitizedDescription}`;
 					}
 					
-					// Read current iteration content
+					// Read current iteration content (without frontmatter)
 					const currentContent = await this.app.vault.read(file);
+					const contentWithoutFrontmatter = this.stripFrontmatter(currentContent);
 					
-					// Create new iteration file in the same folder (flat structure)
+					// Build new frontmatter with updated iteration number and synced llm-links
+					const newFrontmatter = this.buildFrontmatter({
+						'note-type': 'prompt',
+						'prompt-group': promptGroup,
+						'iteration': nextVersion,
+						'llm-links': llmLinks
+					});
+					
+					// Create new iteration file
 					const newIterationPath = `${mocFolder.path}/${newIterationName}.md`;
-					const newFile = await this.createFileWithContent(newIterationPath, currentContent);
+					const newFile = await this.createFileWithContent(
+						newIterationPath, 
+						newFrontmatter + contentWithoutFrontmatter
+					);
 					
-					// Update hub file to include new iteration
-					await this.addIterationToHub(hubFile, newFile);
+					// Find the MOC file and update it
+					const mocFile = mocFolder.children?.find(
+						child => child instanceof TFile && this.isMOC(child)
+					) as TFile;
+					
+					if (mocFile) {
+						await this.addPromptToMOC(mocFile, promptGroup, newFile);
+					}
 					
 					// Open the new iteration file
 					await this.app.workspace.getLeaf().openFile(newFile);
@@ -1159,86 +1309,33 @@ ${selector} .nav-folder-collapse-indicator {
 	}
 
 	/**
-	 * Adds a new iteration link to the prompt hub file
+	 * Strips frontmatter from content
 	 */
-	private async addIterationToHub(hubFile: TFile, newIterationFile: TFile) {
-		try {
-			let content = await this.app.vault.read(hubFile);
-			let lines = content.split('\n');
-			
-			// Find the Iterations section
-			const iterationsIndex = lines.findIndex(line => line.trim() === '## Iterations');
-			if (iterationsIndex === -1) {
-				// If no Iterations section exists, create it after frontmatter
-				const frontmatterEnd = this.findFrontmatterEnd(lines);
-				const titleIndex = lines.findIndex((line, i) => i >= frontmatterEnd && line.startsWith('# '));
-				const insertIndex = titleIndex !== -1 ? titleIndex + 1 : frontmatterEnd;
-				
-				lines.splice(insertIndex, 0, '', '## Iterations', '', `- [[${newIterationFile.basename}]]`, '');
-			} else {
-				// Find where to insert the new iteration (after the section header)
-				let insertIndex = iterationsIndex + 1;
-				
-				// Skip empty lines after section header
-				while (insertIndex < lines.length && lines[insertIndex].trim() === '') {
-					insertIndex++;
-				}
-				
-				// Insert the new iteration link
-				lines.splice(insertIndex, 0, `- [[${newIterationFile.basename}]]`);
-			}
-			
-			await this.app.vault.modify(hubFile, lines.join('\n'));
-		} catch (error) {
-			throw this.wrapError(error, 'Failed to update hub file with new iteration', 'update', hubFile.path);
-		}
+	private stripFrontmatter(content: string): string {
+		const lines = content.split('\n');
+		if (lines[0] !== '---') return content;
+		
+		const closingIndex = lines.slice(1).indexOf('---');
+		if (closingIndex === -1) return content;
+		
+		return lines.slice(closingIndex + 2).join('\n');
 	}
+
 
 	async openLLMLinks(file: TFile) {
 		try {
-			// Read the hub file content
-			const content = await this.app.vault.read(file);
-			const lines = content.split('\n');
+			// Phase 3: Read LLM links from frontmatter instead of hub file
+			const metadata = this.app.metadataCache.getFileCache(file);
+			const frontmatter = metadata?.frontmatter;
 			
-			// Find the LLM Links section
-			const llmLinksIndex = lines.findIndex(line => line.trim() === '## LLM Links');
-			if (llmLinksIndex === -1) {
-				new Notice('No LLM Links section found in this prompt hub.');
+			if (!frontmatter || !frontmatter['llm-links']) {
+				new Notice('No LLM links found in frontmatter.');
 				return;
 			}
 			
-			// Find the llm-links code block
-			let codeBlockStart = -1;
-			let codeBlockEnd = -1;
-			
-			for (let i = llmLinksIndex + 1; i < lines.length; i++) {
-				const line = lines[i].trim();
-				
-				if (line === '```llm-links' || line === '```llm-links' || line.startsWith('```llm-links')) {
-					codeBlockStart = i + 1;
-				} else if (codeBlockStart !== -1 && line === '```') {
-					codeBlockEnd = i;
-					break;
-				} else if (line.startsWith('## ') && codeBlockStart === -1) {
-					// Hit another section without finding code block
-					break;
-				}
-			}
-			
-			if (codeBlockStart === -1) {
-				new Notice('No llm-links code block found. Add URLs in a ```llm-links code block.');
-				return;
-			}
-			
-			// Extract URLs from the code block
-			const urlLines = lines.slice(codeBlockStart, codeBlockEnd === -1 ? lines.length : codeBlockEnd);
-			const urls = urlLines
-				.map(line => line.trim())
-				.filter(line => line.length > 0)
-				.filter(line => this.isValidUrl(line));
-			
-			if (urls.length === 0) {
-				new Notice('No valid URLs found in LLM Links section.');
+			const llmLinks = frontmatter['llm-links'];
+			if (!Array.isArray(llmLinks) || llmLinks.length === 0) {
+				new Notice('No LLM links found in frontmatter.');
 				return;
 			}
 			
@@ -1246,20 +1343,27 @@ ${selector} .nav-folder-collapse-indicator {
 			const { shell } = window.require('electron');
 			let openedCount = 0;
 			
-			for (const url of urls) {
-				try {
-					await shell.openExternal(url);
-					openedCount++;
-					// Small delay between opens to prevent overwhelming the system
-					await delay(200);
-				} catch (error) {
-					console.warn(`Failed to open URL: ${url}`, error);
+			for (const url of llmLinks) {
+				if (typeof url === 'string' && this.isValidUrl(url)) {
+					try {
+						await shell.openExternal(url);
+						openedCount++;
+						// Small delay between opens to prevent overwhelming the system
+						await delay(200);
+					} catch (error) {
+						console.warn(`Failed to open URL: ${url}`, error);
+					}
 				}
 			}
 			
-			const message = openedCount === urls.length 
+			if (openedCount === 0) {
+				new Notice('No valid URLs found to open.');
+				return;
+			}
+			
+			const message = openedCount === llmLinks.length 
 				? `Opened ${openedCount} LLM conversation${openedCount === 1 ? '' : 's'}`
-				: `Opened ${openedCount} of ${urls.length} LLM conversations (some failed)`;
+				: `Opened ${openedCount} of ${llmLinks.length} LLM conversations (some failed)`;
 			
 			new Notice(message);
 			

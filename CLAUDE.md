@@ -4,10 +4,10 @@
 This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) system for note organization. The plugin is currently stable and fully functional.
 
 ## Current State
-- **Status**: Redesign in progress - Phase 2 complete
-- **Last update**: Phase 2 - Quick commands with keyboard shortcuts implemented
-- **Active development**: Phase 3 pending - Prompt system overhaul
-- **See**: PLUGIN_REDESIGN_PLAN.md for full roadmap, PHASE2_TEST_PLAN.md for testing Phase 2
+- **Status**: Redesign in progress - Phase 3 complete
+- **Last update**: Phase 3 - Prompt system overhauled, hub files eliminated
+- **Active development**: Phase 4 pending - Polish & enhancement
+- **See**: PLUGIN_REDESIGN_PLAN.md for full roadmap, PHASE3_TEST_PLAN.md for Phase 3 details
 
 ## File Inventory
 
@@ -61,9 +61,10 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `promoteSubMOCToRoot()` - src/main.ts:1149 - Converts sub-MOC to root
 
 ### Prompt Features
-- `duplicatePromptIteration()` - src/main.ts:885 - Creates new prompt versions (updated for flat structure)
-- `openLLMLinks()` - src/main.ts:1025 - Opens all URLs in prompt hub
+- `duplicatePromptIteration()` - src/main.ts:1208 - Creates new prompt versions (Phase 3 - no hub files)
+- `openLLMLinks()` - src/main.ts:1302 - Opens URLs from iteration frontmatter
 - `extractPromptVersion()` - src/utils/validation.ts:155 - Parses version numbers
+- `addPromptToMOC()` - src/main.ts:1075 - Adds prompts with nested iteration structure
 
 ### Vault Maintenance
 - `updateVaultToLatestSystem()` - src/main.ts:1213 - Updates all plugin files
@@ -85,39 +86,37 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `light-color/dark-color`: Computed theme colors
 - `root-moc-color`: Boolean flag for root MOCs
 
-### File Naming Patterns (After Phase 1)
+### File Naming Patterns (After Phase 3)
 - MOCs: `🎯 [name] MOC.md` (standardized emoji)
 - Resources: `📚 [name].md` (merged notes + resources)
-- Prompts: `🤖 [name].md` (hub) / `🤖 [name] v[N].md` (iterations)
+- Prompts: `🤖 [name] v[N].md` (no hub files, direct iterations)
 
 ### File Naming Patterns (Planned Redesign)
 - MOCs: `🎯 [name] MOC.md` (standardized emoji)
 - Resources: `📚 [name].md` (merges notes + resources)
 - Prompts: `🤖 [name] v[N].md` (no separate hub file)
 
-### Folder Structure (After Phase 1)
+### Folder Structure (After Phase 3)
 ```
 🎯 [MOC Name] MOC/
 ├── 🎯 [MOC Name] MOC.md
 ├── 📚 [Resource Name].md
 ├── 📚 [Another Resource].md
-├── 🤖 [Prompt Name].md (hub - temporary)
 ├── 🤖 [Prompt Name] v1.md
 └── 🤖 [Prompt Name] v2 - description.md
 ```
-Note: Flat structure implemented, no subfolders
+Note: Flat structure, no subfolders, no hub files
 
-### Folder Structure (Planned Redesign)
+### MOC Prompts Section Structure (Phase 3)
+```markdown
+## Prompts
+- 🤖 API Design
+  - [[🤖 API Design v1]]
+  - [[🤖 API Design v2 - Added error handling]]
+- 🤖 Database Schema
+  - [[🤖 Database Schema v1]]
 ```
-[emoji] [MOC Name] MOC/
-├── 🎯 [MOC Name] MOC.md
-├── 📚 Quick Notes.md (default resource)
-├── 📚 [Resource Name].md
-├── 🤖 General Questions v1.md (default prompt)
-├── 🤖 [Prompt Name] v1.md
-└── 🤖 [Prompt Name] v2 - description.md
-```
-Note: Flat structure, no subfolders, prompt hubs eliminated
+Note: Nested structure groups iterations by prompt name
 
 ## Technical Context
 
@@ -151,7 +150,8 @@ Note: Flat structure, no subfolders, prompt hubs eliminated
 - ✅ Phase 1: Subfolder structure creates barriers (RESOLVED)  
 - ✅ Phase 2: Modal fatigue from 11 different modals (RESOLVED - quick commands)
 - ✅ Phase 2: Workflow rigidity requiring too many clicks (RESOLVED - keyboard shortcuts)
-- ⏳ Phase 3: Prompt hub pattern adds unnecessary complexity
+- ✅ Phase 3: Prompt hub pattern adds unnecessary complexity (RESOLVED - direct iterations)
+- ⏳ Phase 4: Default content creation and polish needed
 
 See PLUGIN_REDESIGN_PLAN.md for implementation progress.
 
