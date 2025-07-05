@@ -18,6 +18,10 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `src/constants.ts` - Configuration constants and defaults
 - `src/errors.ts` - Custom error classes for specific error handling
 
+### Documentation
+- `COMPREHENSIVE_TESTING_GUIDE.md` - Complete testing plan for all plugin features
+- `PLUGIN_REDESIGN_PLAN.md` - Historical record of redesign phases
+
 ### Utilities
 - `src/utils/helpers.ts` - General utility functions (emoji, color, frontmatter)
 - `src/utils/validation.ts` - Input validation and sanitization
