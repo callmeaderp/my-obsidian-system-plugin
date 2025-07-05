@@ -21,3 +21,4 @@ export { CreateParentMOCModal } from './CreateParentMOCModal';
 export { SelectParentMOCModal } from './SelectParentMOCModal';
 export { UndoTestChangesModal } from './UndoTestChangesModal';
 export { DeleteMOCContentModal } from './DeleteMOCContentModal';
+export { QuickInputModal } from './QuickInputModal';

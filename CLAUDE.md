@@ -4,10 +4,10 @@
 This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) system for note organization. The plugin is currently stable and fully functional.
 
 ## Current State
-- **Status**: Redesign in progress - Phase 1 complete
-- **Last update**: Phase 1 - Flat folder structure and merged note types
-- **Active development**: Phase 2 starting - Command & keyboard shortcuts
-- **See**: PLUGIN_REDESIGN_PLAN.md for full roadmap, TESTING_PLAN.md for test procedures
+- **Status**: Redesign in progress - Phase 2 complete
+- **Last update**: Phase 2 - Quick commands with keyboard shortcuts implemented
+- **Active development**: Phase 3 pending - Prompt system overhaul
+- **See**: PLUGIN_REDESIGN_PLAN.md for full roadmap, PHASE2_TEST_PLAN.md for testing Phase 2
 
 ## File Inventory
 
@@ -23,8 +23,10 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 
 ### Modals
 - `src/modals/BaseModal.ts` - Base class for all modals
-- `src/modals/CreateMOCModal.ts` - Create new MOCs with optional prompts
-- `src/modals/AddToMOCModal.ts` - Add content to existing MOCs
+- `src/modals/QuickInputModal.ts` - Lightweight modal for quick text input (Phase 2)
+- `src/modals/CreateMOCModal.ts` - Create new MOCs (deprecated - use Quick Create)
+- `src/modals/AddToMOCModal.ts` - Add content to MOCs (deprecated - use Quick Add)
+- `src/modals/CreateItemModal.ts` - Create items (deprecated - use Quick Add)
 - `src/modals/DeleteMOCContentModal.ts` - Context-aware deletion
 - `src/modals/VaultUpdateModal.ts` - Update vault to latest system
 - `src/modals/ReorganizeMOCModal.ts` - Move MOCs in hierarchy
@@ -33,14 +35,19 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `src/modals/UndoTestChangesModal.ts` - Undo session changes
 - `src/modals/SelectParentMOCModal.ts` - Select parent for sub-MOCs
 - `src/modals/CreateParentMOCModal.ts` - Create parent during reorganization
-- `src/modals/CreateItemModal.ts` - Create notes/resources/prompts
 
 ## Key Functions and Locations
 
+### Quick Commands (Phase 2)
+- `quickCreateMOC()` - src/main.ts:455 - Quick MOC creation with default content (Cmd+Shift+M)
+- `quickAdd()` - src/main.ts:485 - Context-aware content addition (Cmd+M)
+- `quickIterate()` - src/main.ts:560 - Quick prompt iteration (Cmd+I)
+- `findParentMOC()` - src/main.ts:536 - Finds parent MOC from file location
+
 ### MOC Creation
-- `createMOC()` - src/main.ts:346 - Creates root MOCs with flat structure
-- `createSubMOC()` - src/main.ts:387 - Creates sub-MOCs under parents
-- `ensureMOCFolderStructure()` - src/main.ts:612 - Creates MOC folder only (no subfolders)
+- `createMOC()` - src/main.ts:379 - Creates root MOCs with flat structure
+- `createSubMOC()` - src/main.ts:420 - Creates sub-MOCs under parents
+- `ensureMOCFolderStructure()` - Creates MOC folder only (no subfolders)
 
 ### File Creation
 - `createFile()` - src/main.ts:436 - Unified factory for all file types
@@ -116,10 +123,11 @@ Note: Flat structure, no subfolders, prompt hubs eliminated
 
 ### Plugin Architecture
 - Uses Obsidian's Plugin API with TypeScript
-- Event-driven with modal-based UI
+- Event-driven with keyboard-first quick commands (Phase 2)
 - Debounced style updates for performance
 - Comprehensive error handling with custom error classes
 - Phase 1 complete: Flat folder structure, merged note types
+- Phase 2 complete: Quick commands reduce modal fatigue
 
 ### Dependencies
 - Obsidian API only, no external dependencies
@@ -141,8 +149,8 @@ Note: Flat structure, no subfolders, prompt hubs eliminated
 ## Current Issues (Being Addressed)
 - ✅ Phase 1: Artificial distinctions between notes and resources (RESOLVED)
 - ✅ Phase 1: Subfolder structure creates barriers (RESOLVED)  
-- ⏳ Phase 2: Modal fatigue from 11 different modals
-- ⏳ Phase 2: Workflow rigidity requiring too many clicks
+- ✅ Phase 2: Modal fatigue from 11 different modals (RESOLVED - quick commands)
+- ✅ Phase 2: Workflow rigidity requiring too many clicks (RESOLVED - keyboard shortcuts)
 - ⏳ Phase 3: Prompt hub pattern adds unnecessary complexity
 
 See PLUGIN_REDESIGN_PLAN.md for implementation progress.

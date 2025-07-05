@@ -5,6 +5,8 @@ import { ValidationError } from '../errors';
 
 /**
  * Generic modal for creating any type of content item
+ * 
+ * @deprecated Phase 2 - Use Quick Add command (Cmd+M) instead for better workflow
  */
 export class CreateItemModal extends BaseModal {
 	constructor(

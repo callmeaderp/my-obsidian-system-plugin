@@ -6,6 +6,8 @@ import type MOCSystemPlugin from '../main';
 /**
  * Modal for creating new root MOCs with optional prompt creation
  * 
+ * @deprecated Phase 2 - Use Quick Create command (Cmd+Shift+M) instead for better workflow
+ * 
  * Provides a streamlined interface for creating both MOCs and initial prompts
  * in a single action, reducing the steps needed to start a new project area.
  */

@@ -5,6 +5,8 @@ import type MOCSystemPlugin from '../main';
 
 /**
  * Modal for adding content to an existing MOC
+ * 
+ * @deprecated Phase 2 - Use Quick Add command (Cmd+M) instead for better workflow
  */
 export class AddToMOCModal extends BaseModal {
 	constructor(

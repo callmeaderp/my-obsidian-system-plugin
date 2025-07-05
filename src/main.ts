@@ -1,4 +1,4 @@
-import { App, Plugin, TFile, TFolder, normalizePath, Notice } from 'obsidian';
+import { App, Plugin, TFile, TFolder, normalizePath, Notice, Modifier } from 'obsidian';
 
 // Plugin modules
 import { PluginSettings, SectionType, NoteType, CreateConfig, ColorInfo, UpdateResult, VaultUpdatePlan } from './types';
@@ -16,7 +16,8 @@ import {
 } from './utils/helpers';
 import {
 	CreateMOCModal, AddToMOCModal, VaultUpdateModal, PromptDescriptionModal,
-	CleanupConfirmationModal, ReorganizeMOCModal, UndoTestChangesModal, DeleteMOCContentModal
+	CleanupConfirmationModal, ReorganizeMOCModal, UndoTestChangesModal, DeleteMOCContentModal,
+	QuickInputModal
 } from './modals';
 
 // =================================================================================
@@ -85,6 +86,28 @@ export default class MOCSystemPlugin extends Plugin {
 	 * Registers all plugin commands
 	 */
 	private registerCommands() {
+		// Phase 2: Quick commands with keyboard shortcuts
+		const quickCommands = [
+			{
+				id: 'quick-create-moc',
+				name: 'Quick Create MOC',
+				callback: () => this.quickCreateMOC(),
+				hotkeys: [{ modifiers: ['Mod', 'Shift'] as Modifier[], key: 'M' }]
+			},
+			{
+				id: 'quick-add',
+				name: 'Quick Add to MOC',
+				callback: () => this.quickAdd(),
+				hotkeys: [{ modifiers: ['Mod'] as Modifier[], key: 'M' }]
+			},
+			{
+				id: 'quick-iterate',
+				name: 'Quick Iterate Prompt',
+				callback: () => this.quickIterate(),
+				hotkeys: [{ modifiers: ['Mod'] as Modifier[], key: 'I' }]
+			}
+		];
+		
 		// Always-available commands
 		const globalCommands = [
 			{ 
@@ -136,6 +159,14 @@ export default class MOCSystemPlugin extends Plugin {
 			}
 		];
 
+		// Register quick commands with keyboard shortcuts
+		quickCommands.forEach(cmd => this.addCommand({
+			id: cmd.id,
+			name: cmd.name,
+			callback: cmd.callback,
+			hotkeys: cmd.hotkeys
+		}));
+		
 		// Register global commands
 		globalCommands.forEach(cmd => this.addCommand(cmd));
 
@@ -415,6 +446,182 @@ ${selector} .nav-folder-collapse-indicator {
 		} catch (error) {
 			throw this.wrapError(error, 'Failed to create sub-MOC', 'create', name);
 		}
+	}
+
+	/**
+	 * Quick MOC creation with minimal UI and default content
+	 * Part of Phase 2: Modal reduction for improved workflow
+	 */
+	async quickCreateMOC(): Promise<void> {
+		const modal = new QuickInputModal(
+			this.app,
+			'Create new MOC',
+			'Enter MOC name...',
+			async (name: string) => {
+				try {
+					// Create the MOC
+					const mocFile = await this.createMOC(name);
+					
+					// Create default content as per Phase 2 requirements
+					const mocFolder = mocFile.parent;
+					if (mocFolder) {
+						// Create default resource: Quick Notes.md
+						await this.createResource(mocFile, 'Quick Notes');
+						
+						// Create default prompt: General Questions v1.md
+						await this.createPrompt(mocFile, 'General Questions');
+					}
+					
+					// Notify user
+					new Notice(`Created MOC with default content: ${name}`);
+				} catch (error) {
+					console.error('Quick create MOC error:', error);
+					new Notice(`Failed to create MOC: ${error.message}`);
+				}
+			}
+		);
+		
+		modal.open();
+	}
+
+	/**
+	 * Quick Add command - context-aware content addition
+	 * Part of Phase 2: Modal reduction
+	 */
+	async quickAdd(): Promise<void> {
+		const activeFile = this.app.workspace.getActiveFile();
+		let targetMOC: TFile | null = null;
+		
+		// First, check if current file is a MOC
+		if (activeFile && this.isMOC(activeFile)) {
+			targetMOC = activeFile;
+		} else if (activeFile) {
+			// Find parent MOC by traversing up the folder structure
+			targetMOC = this.findParentMOC(activeFile);
+		}
+		
+		if (targetMOC) {
+			// We're in a MOC context, show quick options
+			const modal = new QuickInputModal(
+				this.app,
+				`Add to ${targetMOC.basename}`,
+				'Enter name (prefix with 📚 for resource, 🤖 for prompt)...',
+				async (input: string) => {
+					try {
+						// Detect type based on emoji prefix or default to resource
+						if (input.startsWith('🤖')) {
+							const name = input.substring(2).trim();
+							await this.createPrompt(targetMOC!, name);
+						} else {
+							// Default to resource, strip emoji if present
+							const name = input.startsWith('📚') ? input.substring(2).trim() : input;
+							await this.createResource(targetMOC!, name);
+						}
+					} catch (error) {
+						console.error('Quick add error:', error);
+						new Notice(`Failed to add content: ${error.message}`);
+					}
+				}
+			);
+			modal.open();
+		} else {
+			// Not in MOC context, fall back to MOC selector
+			new Notice('Not in a MOC context. Use Quick Create (Cmd+Shift+M) to create a new MOC.');
+		}
+	}
+	
+	/**
+	 * Finds the parent MOC by traversing up the folder hierarchy
+	 */
+	private findParentMOC(file: TFile): TFile | null {
+		let currentFolder = file.parent;
+		
+		while (currentFolder) {
+			// Check if this folder contains a MOC file
+			const mocFile = currentFolder.children.find(
+				child => child instanceof TFile && this.isMOC(child)
+			);
+			
+			if (mocFile instanceof TFile) {
+				return mocFile;
+			}
+			
+			// Move up one level
+			currentFolder = currentFolder.parent;
+		}
+		
+		return null;
+	}
+
+	/**
+	 * Quick Iterate command - duplicates current prompt iteration
+	 * Part of Phase 2: Modal reduction
+	 */
+	async quickIterate(): Promise<void> {
+		const activeFile = this.app.workspace.getActiveFile();
+		
+		// Check if current file is a prompt iteration
+		if (!activeFile || !this.isPromptIteration(activeFile)) {
+			new Notice('Current file is not a prompt iteration.');
+			return;
+		}
+		
+		// Extract current version
+		const currentVersion = extractPromptVersion(activeFile.basename);
+		if (!currentVersion) {
+			new Notice('Could not determine version number from file name.');
+			return;
+		}
+		
+		// Quick input for optional description
+		const modal = new QuickInputModal(
+			this.app,
+			`Create v${currentVersion + 1}`,
+			'Optional description (or press Enter to skip)...',
+			async (description: string) => {
+				try {
+					const mocFolder = activeFile.parent;
+					if (!mocFolder) {
+						throw new Error('Could not find MOC folder.');
+					}
+					
+					// Build new iteration filename
+					const baseIterationName = activeFile.basename.replace(/ v\d+.*$/, '');
+					let newIterationName = `${baseIterationName} v${currentVersion + 1}`;
+					if (description.trim()) {
+						const sanitizedDescription = sanitizeInput(description, 'iteration description');
+						newIterationName += ` - ${sanitizedDescription}`;
+					}
+					
+					// Read current content and create new file
+					const currentContent = await this.app.vault.read(activeFile);
+					const newIterationPath = `${mocFolder.path}/${newIterationName}.md`;
+					const newFile = await this.createFileWithContent(newIterationPath, currentContent);
+					
+					// Find and update hub file
+					const iterationBaseName = activeFile.basename.replace(/ v\d+.*$/, '');
+					const hubFileName = `${iterationBaseName}.md`;
+					const hubFile = mocFolder.children?.find(child => 
+						child instanceof TFile && child.name === hubFileName
+					) as TFile;
+					
+					if (hubFile) {
+						await this.addIterationToHub(hubFile, newFile);
+					}
+					
+					// Open the new iteration
+					await this.app.workspace.getLeaf().openFile(newFile);
+					new Notice(`Created v${currentVersion + 1}${description ? ` - ${description}` : ''}`);
+					
+				} catch (error) {
+					console.error('Quick iterate error:', error);
+					new Notice(`Failed to create iteration: ${error.message}`);
+				}
+			}
+		);
+		
+		// Configure modal to allow empty input
+		modal.open();
 	}
 
 	// =================================================================================
