@@ -39,42 +39,42 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 ## Key Functions and Locations
 
 ### Quick Commands (Phase 2-3)
-- `quickCreateMOC()` - src/main.ts:457 - Quick MOC creation with default content (Cmd+Shift+M)
-- `quickAdd()` - src/main.ts:491 - Context-aware content addition (Cmd+M)
-- `quickIterate()` - src/main.ts:560 - Quick prompt iteration with frontmatter sync (Cmd+I)
-- `findParentMOC()` - src/main.ts:536 - Finds parent MOC from file location
+- `quickCreateMOC()` - src/main.ts:513 - Quick MOC creation with default content (Cmd+Shift+M)
+- `quickAdd()` - src/main.ts:536 - Context-aware content addition (Cmd+M)
+- `quickIterate()` - src/main.ts:605 - Quick prompt iteration with frontmatter sync (Cmd+I)
+- `findParentMOC()` - src/main.ts:581 - Finds parent MOC from file location
 
 ### MOC Creation
-- `createMOC()` - src/main.ts:379 - Creates root MOCs with flat structure
-- `createSubMOC()` - src/main.ts:420 - Creates sub-MOCs under parents
-- `ensureMOCFolderStructure()` - src/main.ts:353 - Creates MOC folder only (no subfolders)
+- `createMOC()` - src/main.ts:429 - Creates root MOCs with flat structure
+- `createSubMOC()` - src/main.ts:472 - Creates sub-MOCs under parents
+- `ensureMOCFolderStructure()` - src/main.ts:864 - Creates MOC folder only (no subfolders)
 
 ### File Creation
-- `createFile()` - src/main.ts:643 - Unified factory for all file types (Phase 3 updated)
-- `createResource()` - src/main.ts:654 - Creates resource files
-- `createPrompt()` - src/main.ts:658 - Creates prompt v1 directly (no hub files)
+- `createFile()` - src/main.ts:711 - Unified factory for all file types (Phase 3 updated)
+- `createResource()` - src/main.ts:700 - Creates resource files
+- `createPrompt()` - src/main.ts:704 - Creates prompt v1 directly (no hub files)
 
 ### MOC Management
-- `addToMOCSection()` - src/main.ts:955 - Adds links to MOC sections
-- `reorganizeContentForPluginSections()` - src/main.ts:1010 - Maintains section order
-- `moveRootMOCToSub()` - src/main.ts:1459 - Converts root to sub-MOC
-- `promoteSubMOCToRoot()` - src/main.ts:1485 - Converts sub-MOC to root
+- `addToMOCSection()` - src/main.ts:1007 - Adds links to MOC sections
+- `reorganizeContentForPluginSections()` - src/main.ts:1078 - Maintains section order
+- `moveRootMOCToSub()` - src/main.ts:1456 - Converts root to sub-MOC
+- `promoteSubMOCToRoot()` - src/main.ts:1482 - Converts sub-MOC to root
 
 ### Prompt Features
-- `duplicatePromptIteration()` - src/main.ts:1208 - Creates new prompt versions (Phase 3 - no hub files)
-- `openLLMLinks()` - src/main.ts:1302 - Opens URLs from iteration frontmatter
+- `duplicatePromptIteration()` - src/main.ts:1288 - Creates new prompt versions (Phase 3 - no hub files)
+- `openLLMLinks()` - src/main.ts:1382 - Opens URLs from iteration frontmatter
 - `extractPromptVersion()` - src/utils/validation.ts:155 - Parses version numbers
-- `addPromptToMOC()` - src/main.ts:1075 - Adds prompts with nested iteration structure
+- `addPromptToMOC()` - src/main.ts:1155 - Adds prompts with nested iteration structure
 
 ### Vault Maintenance
-- `updateVaultToLatestSystem()` - src/main.ts:1549 - Updates all plugin files
-- `cleanupMOCSystem()` - src/main.ts:1993 - Removes all plugin files
-- `undoTestChanges()` - src/main.ts:2024 - Removes files created in session
-- `cleanupBrokenLinks()` - src/main.ts:2058 - Removes links to deleted files
+- `updateVaultToLatestSystem()` - src/main.ts:1546 - Updates all plugin files
+- `cleanupMOCSystem()` - src/main.ts:1983 - Removes all plugin files
+- `undoTestChanges()` - src/main.ts:2014 - Removes files created in session
+- `cleanupBrokenLinks()` - src/main.ts:2048 - Removes links to deleted files
 
 ### Styling
-- `updateMOCStyles()` - src/main.ts:201 - Generates dynamic CSS for MOC colors
-- `generateMOCColorStyles()` - src/main.ts:238 - Creates folder color rules
+- `updateMOCStyles()` - src/main.ts:245 - Generates dynamic CSS for MOC colors
+- `generateMOCColorStyles()` - src/main.ts:289 - Creates folder color rules
 - `generateRandomColor()` - src/utils/helpers.ts:28 - Generates HSL colors
 
 ## Important Data Structures
