@@ -4,10 +4,10 @@
 This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) system for note organization. The plugin is currently stable and fully functional.
 
 ## Current State
-- **Status**: Production-ready, undergoing redesign to reduce friction
-- **Last major refactor**: Comprehensive code cleanup completed
-- **Active development**: Major redesign planned - see PLUGIN_REDESIGN_PLAN.md
-- **Known issues**: Modal fatigue and workflow rigidity (being addressed in redesign)
+- **Status**: Redesign in progress - Phase 1 complete
+- **Last update**: Phase 1 - Flat folder structure and merged note types
+- **Active development**: Phase 2 starting - Command & keyboard shortcuts
+- **See**: PLUGIN_REDESIGN_PLAN.md for full roadmap, TESTING_PLAN.md for test procedures
 
 ## File Inventory
 
@@ -38,14 +38,14 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 ## Key Functions and Locations
 
 ### MOC Creation
-- `createMOC()` - src/main.ts:382 - Creates root MOCs with folder structure
-- `createSubMOC()` - src/main.ts:417 - Creates sub-MOCs under parents
-- `ensureMOCFolderStructure()` - src/main.ts:622 - Creates Notes/Resources/Prompts folders
+- `createMOC()` - src/main.ts:346 - Creates root MOCs with flat structure
+- `createSubMOC()` - src/main.ts:387 - Creates sub-MOCs under parents
+- `ensureMOCFolderStructure()` - src/main.ts:612 - Creates MOC folder only (no subfolders)
 
 ### File Creation
-- `createFile()` - src/main.ts:440 - Unified factory for all file types
-- `createNote/Resource/Prompt()` - src/main.ts:424-435 - Type-specific helpers
-- `createPromptWithIterations()` - src/main.ts:498 - Creates prompt hub + v1 iteration
+- `createFile()` - src/main.ts:436 - Unified factory for all file types
+- `createResource/Prompt()` - src/main.ts:425-431 - Type-specific helpers (Note type removed)
+- `createPromptWithIterations()` - src/main.ts:488 - Creates prompt hub + v1 in flat structure
 
 ### MOC Management
 - `addToMOCSection()` - src/main.ts:779 - Adds links to MOC sections
@@ -54,7 +54,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `promoteSubMOCToRoot()` - src/main.ts:1149 - Converts sub-MOC to root
 
 ### Prompt Features
-- `duplicatePromptIteration()` - src/main.ts:916 - Creates new prompt versions
+- `duplicatePromptIteration()` - src/main.ts:885 - Creates new prompt versions (updated for flat structure)
 - `openLLMLinks()` - src/main.ts:1025 - Opens all URLs in prompt hub
 - `extractPromptVersion()` - src/utils/validation.ts:155 - Parses version numbers
 
@@ -72,16 +72,15 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 ## Important Data Structures
 
 ### Frontmatter Fields
-- `note-type`: 'moc' | 'note' | 'resource' | 'prompt'
+- `note-type`: 'moc' | 'resource' | 'prompt' (note type removed)
 - `tags`: Array, includes 'moc' for MOC files
 - `moc-hue/saturation/lightness`: Color values
 - `light-color/dark-color`: Computed theme colors
 - `root-moc-color`: Boolean flag for root MOCs
 
-### File Naming Patterns (Current)
-- MOCs: `[emoji] [name] MOC.md`
-- Notes: `📝 [name].md`
-- Resources: `📁 [name].md`
+### File Naming Patterns (After Phase 1)
+- MOCs: `🎯 [name] MOC.md` (standardized emoji)
+- Resources: `📚 [name].md` (merged notes + resources)
 - Prompts: `🤖 [name].md` (hub) / `🤖 [name] v[N].md` (iterations)
 
 ### File Naming Patterns (Planned Redesign)
@@ -89,18 +88,17 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - Resources: `📚 [name].md` (merges notes + resources)
 - Prompts: `🤖 [name] v[N].md` (no separate hub file)
 
-### Folder Structure (Current)
+### Folder Structure (After Phase 1)
 ```
-[emoji] [MOC Name] MOC/
-├── [emoji] [MOC Name] MOC.md
-├── Notes/
-├── Resources/
-└── Prompts/
-    ├── 🤖 [Prompt Name].md (hub)
-    └── [Prompt Name]/
-        ├── 🤖 [Prompt Name] v1.md
-        └── 🤖 [Prompt Name] v2 - description.md
+🎯 [MOC Name] MOC/
+├── 🎯 [MOC Name] MOC.md
+├── 📚 [Resource Name].md
+├── 📚 [Another Resource].md
+├── 🤖 [Prompt Name].md (hub - temporary)
+├── 🤖 [Prompt Name] v1.md
+└── 🤖 [Prompt Name] v2 - description.md
 ```
+Note: Flat structure implemented, no subfolders
 
 ### Folder Structure (Planned Redesign)
 ```
@@ -121,31 +119,33 @@ Note: Flat structure, no subfolders, prompt hubs eliminated
 - Event-driven with modal-based UI
 - Debounced style updates for performance
 - Comprehensive error handling with custom error classes
+- Phase 1 complete: Flat folder structure, merged note types
 
 ### Dependencies
 - Obsidian API only, no external dependencies
 - Uses Electron's shell API for opening URLs
 
 ### Key Design Decisions
-- Emojis as visual identifiers for instant recognition
+- Standardized emojis for consistency (🎯 MOCs, 📚 Resources, 🤖 Prompts)
 - HSL color generation for theme compatibility
 - Frontmatter-based metadata for flexibility
 - Section ordering enforced for consistency
 - Atomic file operations with rollback capability
+- Flat folder structure for reduced friction (Phase 1)
 
 ## Environment Requirements
 - Obsidian 0.15.0 or higher
 - styles.css file in plugin directory for base styles
 - No other special requirements
 
-## Current Issues
-- Modal fatigue from 11 different modals
-- Workflow rigidity requiring too many clicks
-- Artificial distinctions between notes and resources
-- Prompt hub pattern adds unnecessary complexity
-- Subfolder structure creates barriers to content
+## Current Issues (Being Addressed)
+- ✅ Phase 1: Artificial distinctions between notes and resources (RESOLVED)
+- ✅ Phase 1: Subfolder structure creates barriers (RESOLVED)  
+- ⏳ Phase 2: Modal fatigue from 11 different modals
+- ⏳ Phase 2: Workflow rigidity requiring too many clicks
+- ⏳ Phase 3: Prompt hub pattern adds unnecessary complexity
 
-See PLUGIN_REDESIGN_PLAN.md for detailed solutions.
+See PLUGIN_REDESIGN_PLAN.md for implementation progress.
 
 ## Temporary Workarounds
 None currently in place.
