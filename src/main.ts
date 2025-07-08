@@ -452,9 +452,8 @@ ${selector} .nav-folder-collapse-indicator {
 			const filePath = `${folderName}/${folderName}.md`;
 			const file = await this.createFileWithContent(filePath, frontmatter);
 			
-			// Create default content as per Phase 4 requirements
-			await this.createResource(file, 'Quick Notes');
-			await this.createPrompt(file, 'General Questions');
+			// Create default resource with same name as MOC
+			await this.createResource(file, sanitizedName);
 			
 			// Open file and update styles
 			await this.openFileAndNotify(file, `Created MOC: ${mocName}`);
@@ -492,9 +491,8 @@ ${selector} .nav-folder-collapse-indicator {
 				frontmatter
 			);
 			
-			// Create default content for sub-MOCs as well
-			await this.createResource(file, 'Quick Notes');
-			await this.createPrompt(file, 'General Questions');
+			// Create default resource with same name as sub-MOC
+			await this.createResource(file, sanitizedName);
 			
 			await this.addToMOCSection(parentMOC, 'MOCs', file);
 			new Notice(`Created sub-MOC: ${mocName}`);

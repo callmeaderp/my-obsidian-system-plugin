@@ -5,7 +5,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 
 ## Current State
 - **Status**: Stable - All redesign phases complete, plugin built successfully
-- **Last update**: Phase 4 - Default content, smart emoji detection, performance optimizations
+- **Last update**: Modified default MOC content - removed default prompt, resource now shares MOC name
 - **Architecture**: Keyboard-first workflow with minimal modals
 - **Performance**: Optimized with metadata caching and efficient DOM updates
 - **Build status**: Successfully built with npm dependencies installed
@@ -45,38 +45,38 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 ## Key Functions and Locations
 
 ### Quick Commands (Phase 2-3)
-- `quickCreateMOC()` - src/main.ts:513 - Quick MOC creation with default content (Cmd+Shift+M)
-- `quickAdd()` - src/main.ts:536 - Context-aware content addition (Cmd+M)
-- `quickIterate()` - src/main.ts:605 - Quick prompt iteration with frontmatter sync (Cmd+I)
-- `findParentMOC()` - src/main.ts:581 - Finds parent MOC from file location
+- `quickCreateMOC()` - src/main.ts:511 - Quick MOC creation with default content (Cmd+Shift+M)
+- `quickAdd()` - src/main.ts:534 - Context-aware content addition (Cmd+M)
+- `quickIterate()` - src/main.ts:603 - Quick prompt iteration with frontmatter sync (Cmd+I)
+- `findParentMOC()` - src/main.ts:579 - Finds parent MOC from file location
 
 ### MOC Creation
-- `createMOC()` - src/main.ts:429 - Creates root MOCs with flat structure
-- `createSubMOC()` - src/main.ts:472 - Creates sub-MOCs under parents
-- `ensureMOCFolderStructure()` - src/main.ts:864 - Creates MOC folder only (no subfolders)
+- `createMOC()` - src/main.ts:429 - Creates root MOCs with flat structure and default resource
+- `createSubMOC()` - src/main.ts:470 - Creates sub-MOCs under parents with default resource
+- `ensureMOCFolderStructure()` - src/main.ts:862 - Creates MOC folder only (no subfolders)
 
 ### File Creation
-- `createFile()` - src/main.ts:711 - Unified factory for all file types (Phase 3 updated)
-- `createResource()` - src/main.ts:700 - Creates resource files
-- `createPrompt()` - src/main.ts:704 - Creates prompt v1 directly (no hub files)
+- `createFile()` - src/main.ts:709 - Unified factory for all file types (Phase 3 updated)
+- `createResource()` - src/main.ts:698 - Creates resource files
+- `createPrompt()` - src/main.ts:702 - Creates prompt v1 directly (no hub files)
 
 ### MOC Management
-- `addToMOCSection()` - src/main.ts:1007 - Adds links to MOC sections
-- `reorganizeContentForPluginSections()` - src/main.ts:1078 - Maintains section order
-- `moveRootMOCToSub()` - src/main.ts:1456 - Converts root to sub-MOC
-- `promoteSubMOCToRoot()` - src/main.ts:1482 - Converts sub-MOC to root
+- `addToMOCSection()` - src/main.ts:1005 - Adds links to MOC sections
+- `reorganizeContentForPluginSections()` - src/main.ts:1076 - Maintains section order
+- `moveRootMOCToSub()` - src/main.ts:1454 - Converts root to sub-MOC
+- `promoteSubMOCToRoot()` - src/main.ts:1480 - Converts sub-MOC to root
 
 ### Prompt Features
-- `duplicatePromptIteration()` - src/main.ts:1288 - Creates new prompt versions (Phase 3 - no hub files)
-- `openLLMLinks()` - src/main.ts:1382 - Opens URLs from iteration frontmatter
+- `duplicatePromptIteration()` - src/main.ts:1286 - Creates new prompt versions (Phase 3 - no hub files)
+- `openLLMLinks()` - src/main.ts:1380 - Opens URLs from iteration frontmatter
 - `extractPromptVersion()` - src/utils/validation.ts:155 - Parses version numbers
-- `addPromptToMOC()` - src/main.ts:1155 - Adds prompts with nested iteration structure
+- `addPromptToMOC()` - src/main.ts:1153 - Adds prompts with nested iteration structure
 
 ### Vault Maintenance
-- `updateVaultToLatestSystem()` - src/main.ts:1546 - Updates all plugin files
-- `cleanupMOCSystem()` - src/main.ts:1983 - Removes all plugin files
-- `undoTestChanges()` - src/main.ts:2014 - Removes files created in session
-- `cleanupBrokenLinks()` - src/main.ts:2048 - Removes links to deleted files
+- `updateVaultToLatestSystem()` - src/main.ts:1544 - Updates all plugin files
+- `cleanupMOCSystem()` - src/main.ts:1981 - Removes all plugin files
+- `undoTestChanges()` - src/main.ts:2012 - Removes files created in session
+- `cleanupBrokenLinks()` - src/main.ts:2046 - Removes links to deleted files
 
 ### Styling
 - `updateMOCStyles()` - src/main.ts:245 - Generates dynamic CSS for MOC colors
@@ -100,16 +100,13 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - Resources: `📚 [name].md` (merged notes + resources)
 - Prompts: `🤖 [name] v[N].md` (no hub files, direct iterations)
 
-### Folder Structure (After Phase 3)
+### Folder Structure (Current Default)
 ```
 🎯 [MOC Name] MOC/
 ├── 🎯 [MOC Name] MOC.md
-├── 📚 [Resource Name].md
-├── 📚 [Another Resource].md
-├── 🤖 [Prompt Name] v1.md
-└── 🤖 [Prompt Name] v2 - description.md
+└── 📚 [MOC Name].md  (default resource, shares MOC name)
 ```
-Note: Flat structure, no subfolders, no hub files
+Note: Flat structure, no subfolders, no default prompts
 
 ### MOC Prompts Section Structure (Phase 3)
 ```markdown
@@ -149,7 +146,7 @@ Note: Nested structure groups iterations by prompt name
 - Flat folder structure for reduced friction (Phase 1)
 - Keyboard-first design with minimal modals (Phase 2)
 - Direct prompt iterations without hub files (Phase 3)
-- Auto-creation of default content for immediate usability (Phase 4)
+- Auto-creation of default resource with MOC name for immediate usability
 - Smart emoji detection for automatic file typing (Phase 4)
 
 ## Environment Requirements
