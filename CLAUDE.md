@@ -5,7 +5,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 
 ## Current State
 - **Status**: Stable - All redesign phases complete, plugin built successfully
-- **Last update**: Modified default MOC content - removed default prompt, resource now shares MOC name
+- **Last update**: Fixed openLLMLinks function to handle concatenated URL strings in frontmatter
 - **Architecture**: Keyboard-first workflow with minimal modals
 - **Performance**: Optimized with metadata caching and efficient DOM updates
 - **Build status**: Successfully built with npm dependencies installed
@@ -68,7 +68,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 
 ### Prompt Features
 - `duplicatePromptIteration()` - src/main.ts:1286 - Creates new prompt versions (Phase 3 - no hub files)
-- `openLLMLinks()` - src/main.ts:1380 - Opens URLs from iteration frontmatter
+- `openLLMLinks()` - src/main.ts:1380 - Opens URLs from iteration frontmatter (now handles both array and concatenated string formats)
 - `extractPromptVersion()` - src/utils/validation.ts:155 - Parses version numbers
 - `addPromptToMOC()` - src/main.ts:1153 - Adds prompts with nested iteration structure
 
@@ -161,6 +161,9 @@ Note: Nested structure groups iterations by prompt name
 - ✅ Phase 4: Added default content, smart emoji detection, and performance optimizations
 
 All planned redesign phases have been successfully completed.
+
+## Recent Fixes
+- **openLLMLinks Function**: Fixed to handle both array format and concatenated string format in frontmatter. Now properly parses individual URLs from concatenated strings like `https://url1.comhttps://url2.com` using regex pattern matching.
 
 ## Temporary Workarounds
 None currently in place.

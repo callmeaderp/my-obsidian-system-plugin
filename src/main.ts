@@ -1388,8 +1388,23 @@ ${selector} .nav-folder-collapse-indicator {
 				return;
 			}
 			
-			const llmLinks = frontmatter['llm-links'];
-			if (!Array.isArray(llmLinks) || llmLinks.length === 0) {
+			let llmLinks: string[] = [];
+			const llmLinksField = frontmatter['llm-links'];
+			
+			// Handle both array format and concatenated string format
+			if (Array.isArray(llmLinksField)) {
+				llmLinks = llmLinksField;
+			} else if (typeof llmLinksField === 'string') {
+				// Parse concatenated URLs from string
+				// Split by http:// or https:// patterns
+				const urlPattern = /(https?:\/\/[^\s]+)/g;
+				const matches = llmLinksField.match(urlPattern);
+				if (matches) {
+					llmLinks = matches;
+				}
+			}
+			
+			if (llmLinks.length === 0) {
 				new Notice('No LLM links found in frontmatter.');
 				return;
 			}
