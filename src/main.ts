@@ -425,8 +425,10 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Creates a new root MOC with complete structure
+	 * @param name - Name of the MOC to create
+	 * @param createResource - Whether to create a default resource (defaults to true)
 	 */
-	async createMOC(name: string): Promise<TFile> {
+	async createMOC(name: string, createResource: boolean = true): Promise<TFile> {
 		try {
 			// Validate and sanitize the name
 			const sanitizedName = sanitizeInput(name, 'MOC name');
@@ -452,8 +454,10 @@ ${selector} .nav-folder-collapse-indicator {
 			const filePath = `${folderName}/${folderName}.md`;
 			const file = await this.createFileWithContent(filePath, frontmatter);
 			
-			// Create default resource with same name as MOC
-			await this.createResource(file, sanitizedName);
+			// Create default resource with same name as MOC if requested
+			if (createResource) {
+				await this.createResource(file, sanitizedName);
+			}
 			
 			// Open file and update styles
 			await this.openFileAndNotify(file, `Created MOC: ${mocName}`);
@@ -467,8 +471,11 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Creates a sub-MOC within an existing MOC structure
+	 * @param parentMOC - Parent MOC file to create sub-MOC under
+	 * @param name - Name of the sub-MOC to create
+	 * @param createResource - Whether to create a default resource (defaults to true)
 	 */
-	async createSubMOC(parentMOC: TFile, name: string): Promise<TFile> {
+	async createSubMOC(parentMOC: TFile, name: string, createResource: boolean = true): Promise<TFile> {
 		try {
 			const sanitizedName = sanitizeInput(name, 'Sub-MOC name');
 			const mocName = ensureMOCSuffix(sanitizedName);
@@ -491,8 +498,10 @@ ${selector} .nav-folder-collapse-indicator {
 				frontmatter
 			);
 			
-			// Create default resource with same name as sub-MOC
-			await this.createResource(file, sanitizedName);
+			// Create default resource with same name as sub-MOC if requested
+			if (createResource) {
+				await this.createResource(file, sanitizedName);
+			}
 			
 			await this.addToMOCSection(parentMOC, 'MOCs', file);
 			new Notice(`Created sub-MOC: ${mocName}`);

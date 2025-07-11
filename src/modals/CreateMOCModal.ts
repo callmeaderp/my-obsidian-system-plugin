@@ -27,6 +27,23 @@ export class CreateMOCModal extends BaseModal {
 		const mocNameEl = this.createInput('MOC name...');
 		mocNameEl.style.marginBottom = '15px';
 
+		// Resource creation section
+		// Default resource creation option for immediate usability
+		const resourceSection = this.contentEl.createDiv();
+		resourceSection.style.cssText = 'border-top: 1px solid var(--background-modifier-border); padding-top: 15px; margin-top: 15px;';
+
+		const resourceCheckboxContainer = resourceSection.createDiv();
+		resourceCheckboxContainer.style.cssText = 'display: flex; align-items: center; margin-bottom: 10px;';
+
+		const createResourceCheckbox = resourceCheckboxContainer.createEl('input', { type: 'checkbox' });
+		createResourceCheckbox.id = 'create-resource-checkbox';
+		createResourceCheckbox.checked = true; // Default to creating resource for backwards compatibility
+		createResourceCheckbox.style.marginRight = '8px';
+		
+		const resourceCheckboxLabel = resourceCheckboxContainer.createEl('label', { text: 'Create default resource' });
+		resourceCheckboxLabel.setAttribute('for', 'create-resource-checkbox');
+		resourceCheckboxLabel.style.cursor = 'pointer';
+
 		// Optional prompt creation section
 		// Separated visually to indicate it's an additional feature
 		const promptSection = this.contentEl.createDiv({ cls: CSS_CLASSES.CREATION_PROMPT_SECTION });
@@ -84,7 +101,7 @@ export class CreateMOCModal extends BaseModal {
 			}
 
 			try {
-				const mocFile = await this.plugin.createMOC(mocName);
+				const mocFile = await this.plugin.createMOC(mocName, createResourceCheckbox.checked);
 				
 				// Create prompt if requested
 				if (createPromptCheckbox.checked) {

@@ -45,38 +45,38 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 ## Key Functions and Locations
 
 ### Quick Commands (Phase 2-3)
-- `quickCreateMOC()` - src/main.ts:511 - Quick MOC creation with default content (Cmd+Shift+M)
-- `quickAdd()` - src/main.ts:534 - Context-aware content addition (Cmd+M)
-- `quickIterate()` - src/main.ts:603 - Quick prompt iteration with frontmatter sync (Cmd+I)
-- `findParentMOC()` - src/main.ts:579 - Finds parent MOC from file location
+- `quickCreateMOC()` - src/main.ts:520 - Quick MOC creation with default content (Cmd+Shift+M)
+- `quickAdd()` - src/main.ts:543 - Context-aware content addition (Cmd+M)
+- `quickIterate()` - src/main.ts:612 - Quick prompt iteration with frontmatter sync (Cmd+I)
+- `findParentMOC()` - src/main.ts:588 - Finds parent MOC from file location
 
 ### MOC Creation
-- `createMOC()` - src/main.ts:429 - Creates root MOCs with flat structure and default resource
-- `createSubMOC()` - src/main.ts:470 - Creates sub-MOCs under parents with default resource
-- `ensureMOCFolderStructure()` - src/main.ts:862 - Creates MOC folder only (no subfolders)
+- `createMOC()` - src/main.ts:431 - Creates root MOCs with optional default resource (createResource parameter defaults to true)
+- `createSubMOC()` - src/main.ts:478 - Creates sub-MOCs under parents with optional default resource (createResource parameter defaults to true)
+- `ensureMOCFolderStructure()` - src/main.ts:871 - Creates MOC folder only (no subfolders)
 
 ### File Creation
-- `createFile()` - src/main.ts:709 - Unified factory for all file types (Phase 3 updated)
-- `createResource()` - src/main.ts:698 - Creates resource files
-- `createPrompt()` - src/main.ts:702 - Creates prompt v1 directly (no hub files)
+- `createFile()` - src/main.ts:718 - Unified factory for all file types (Phase 3 updated)
+- `createResource()` - src/main.ts:707 - Creates resource files
+- `createPrompt()` - src/main.ts:711 - Creates prompt v1 directly (no hub files)
 
 ### MOC Management
-- `addToMOCSection()` - src/main.ts:1005 - Adds links to MOC sections
-- `reorganizeContentForPluginSections()` - src/main.ts:1076 - Maintains section order
-- `moveRootMOCToSub()` - src/main.ts:1454 - Converts root to sub-MOC
-- `promoteSubMOCToRoot()` - src/main.ts:1480 - Converts sub-MOC to root
+- `addToMOCSection()` - src/main.ts:1014 - Adds links to MOC sections
+- `reorganizeContentForPluginSections()` - src/main.ts:1085 - Maintains section order
+- `moveRootMOCToSub()` - src/main.ts:1478 - Converts root to sub-MOC
+- `promoteSubMOCToRoot()` - src/main.ts:1504 - Converts sub-MOC to root
 
 ### Prompt Features
-- `duplicatePromptIteration()` - src/main.ts:1286 - Creates new prompt versions (Phase 3 - no hub files)
-- `openLLMLinks()` - src/main.ts:1380 - Opens URLs from iteration frontmatter (now handles both array and concatenated string formats)
+- `duplicatePromptIteration()` - src/main.ts:1295 - Creates new prompt versions (Phase 3 - no hub files)
+- `openLLMLinks()` - src/main.ts:1389 - Opens URLs from iteration frontmatter (now handles both array and concatenated string formats)
 - `extractPromptVersion()` - src/utils/validation.ts:155 - Parses version numbers
-- `addPromptToMOC()` - src/main.ts:1153 - Adds prompts with nested iteration structure
+- `addPromptToMOC()` - src/main.ts:1162 - Adds prompts with nested iteration structure
 
 ### Vault Maintenance
-- `updateVaultToLatestSystem()` - src/main.ts:1544 - Updates all plugin files
-- `cleanupMOCSystem()` - src/main.ts:1981 - Removes all plugin files
-- `undoTestChanges()` - src/main.ts:2012 - Removes files created in session
-- `cleanupBrokenLinks()` - src/main.ts:2046 - Removes links to deleted files
+- `updateVaultToLatestSystem()` - src/main.ts:1568 - Updates all plugin files
+- `cleanupMOCSystem()` - src/main.ts:2005 - Removes all plugin files
+- `undoTestChanges()` - src/main.ts:2036 - Removes files created in session
+- `cleanupBrokenLinks()` - src/main.ts:2070 - Removes links to deleted files
 
 ### Styling
 - `updateMOCStyles()` - src/main.ts:245 - Generates dynamic CSS for MOC colors
@@ -164,6 +164,7 @@ All planned redesign phases have been successfully completed.
 
 ## Recent Fixes
 - **openLLMLinks Function**: Fixed to handle both array format and concatenated string format in frontmatter. Now properly parses individual URLs from concatenated strings like `https://url1.comhttps://url2.com` using regex pattern matching.
+- **Optional Resource Creation**: Added ability to skip creating default resource when creating MOCs. Both `createMOC()` and `createSubMOC()` now accept an optional `createResource` parameter (defaults to true for backwards compatibility). CreateMOCModal now includes a checkbox to control resource creation.
 
 ## Temporary Workarounds
 None currently in place.
