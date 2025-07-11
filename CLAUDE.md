@@ -48,6 +48,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `quickCreateMOC()` - src/main.ts:520 - Quick MOC creation with default content (Cmd+Shift+M)
 - `quickAdd()` - src/main.ts:543 - Context-aware content addition (Cmd+M)
 - `quickIterate()` - src/main.ts:612 - Quick prompt iteration with frontmatter sync (Cmd+I)
+- `toggleArchiveMOC()` - src/main.ts:2304 - Archive/unarchive MOC (Cmd+Shift+A)
 - `findParentMOC()` - src/main.ts:588 - Finds parent MOC from file location
 
 ### MOC Creation
@@ -65,6 +66,9 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `reorganizeContentForPluginSections()` - src/main.ts:1085 - Maintains section order
 - `moveRootMOCToSub()` - src/main.ts:1478 - Converts root to sub-MOC
 - `promoteSubMOCToRoot()` - src/main.ts:1504 - Converts sub-MOC to root
+- `archiveMOC()` - src/main.ts:2214 - Archives MOC to archived folder
+- `unarchiveMOC()` - src/main.ts:2259 - Restores MOC from archive
+- `markMOCFilesAsArchived()` - src/main.ts:2326 - Updates frontmatter for archive state
 
 ### Prompt Features
 - `duplicatePromptIteration()` - src/main.ts:1295 - Creates new prompt versions (Phase 3 - no hub files)
@@ -86,7 +90,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 ## Important Data Structures
 
 ### Frontmatter Fields
-- `note-type`: 'moc' | 'resource' | 'prompt'
+- `note-type`: 'moc' | 'resource' | 'prompt' | 'archived-*' (archived prefix for filtering)
 - `tags`: Array, includes 'moc' for MOC files
 - `moc-hue/saturation/lightness`: Color values
 - `light-color/dark-color`: Computed theme colors
@@ -162,7 +166,8 @@ Note: Nested structure groups iterations by prompt name
 
 All planned redesign phases have been successfully completed.
 
-## Recent Fixes
+## Recent Fixes & Features
+- **MOC Archiving**: Added archive/unarchive functionality (Cmd+Shift+A). Archives move entire MOC folders to an "archived" folder and prefix note-type with "archived-" to filter from graph view. Works from any file within a MOC.
 - **openLLMLinks Function**: Fixed to handle both array format and concatenated string format in frontmatter. Now properly parses individual URLs from concatenated strings like `https://url1.comhttps://url2.com` using regex pattern matching.
 - **Optional Resource Creation**: Added ability to skip creating default resource when creating MOCs. Both `createMOC()` and `createSubMOC()` now accept an optional `createResource` parameter (defaults to true for backwards compatibility). CreateMOCModal now includes a checkbox to control resource creation.
 

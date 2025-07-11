@@ -109,6 +109,12 @@ export default class MOCSystemPlugin extends Plugin {
 				name: 'Quick Iterate Prompt',
 				callback: () => this.quickIterate(),
 				hotkeys: [{ modifiers: ['Mod'] as Modifier[], key: 'I' }]
+			},
+			{
+				id: 'toggle-archive-moc',
+				name: 'Archive/Unarchive MOC',
+				callback: () => this.toggleArchiveMOC(),
+				hotkeys: [{ modifiers: ['Mod', 'Shift'] as Modifier[], key: 'A' }]
 			}
 		];
 		
@@ -2201,6 +2207,188 @@ ${selector} .nav-folder-collapse-indicator {
 			console.error('Smart emoji detection error:', error);
 			// Don't show notice for auto-detection errors to avoid spam
 		}
+	}
+
+	// =================================================================================
+	// MOC ARCHIVING FUNCTIONALITY
+	// =================================================================================
+
+	/**
+	 * Archives a MOC by moving it to the archived folder and marking its files
+	 * @param file Any file within the MOC to archive
+	 */
+	async archiveMOC(file: TFile): Promise<void> {
+		try {
+			// Find the MOC file - could be the file itself or parent MOC
+			let mocFile: TFile | null = null;
+			let mocFolder: TFolder | null = null;
+			
+			if (this.isMOC(file)) {
+				mocFile = file;
+				mocFolder = file.parent;
+			} else {
+				// Find parent MOC
+				mocFile = this.findParentMOC(file);
+				mocFolder = mocFile?.parent || null;
+			}
+			
+			if (!mocFile || !mocFolder) {
+				throw new Error('No MOC found to archive');
+			}
+			
+			// Create archived folder if it doesn't exist
+			const archivedPath = 'archived';
+			if (!this.app.vault.getAbstractFileByPath(archivedPath)) {
+				await this.app.vault.createFolder(archivedPath);
+			}
+			
+			// Move the MOC folder to archived
+			const newPath = normalizePath(`${archivedPath}/${mocFolder.name}`);
+			await this.app.vault.rename(mocFolder, newPath);
+			
+			// Update frontmatter for all files in the archived MOC
+			const archivedFolder = this.app.vault.getAbstractFileByPath(newPath) as TFolder;
+			if (archivedFolder) {
+				await this.markMOCFilesAsArchived(archivedFolder, true);
+			}
+			
+			new Notice(`Archived MOC: ${mocFile.basename}`);
+		} catch (error) {
+			this.handleError('Error archiving MOC', error);
+		}
+	}
+	
+	/**
+	 * Unarchives a MOC by moving it back to root and restoring its files
+	 * @param file Any file within the archived MOC to restore
+	 */
+	async unarchiveMOC(file: TFile): Promise<void> {
+		try {
+			// Find the MOC file
+			let mocFile: TFile | null = null;
+			let mocFolder: TFolder | null = null;
+			
+			if (this.isMOC(file)) {
+				mocFile = file;
+				mocFolder = file.parent;
+			} else {
+				// Find parent MOC
+				mocFile = this.findParentMOC(file);
+				mocFolder = mocFile?.parent || null;
+			}
+			
+			if (!mocFile || !mocFolder) {
+				throw new Error('No MOC found to unarchive');
+			}
+			
+			// Check if it's actually in the archived folder
+			if (!mocFolder.path.startsWith('archived/')) {
+				throw new Error('MOC is not archived');
+			}
+			
+			// Move the MOC folder back to root
+			const folderName = mocFolder.name;
+			const newPath = normalizePath(folderName);
+			await this.app.vault.rename(mocFolder, newPath);
+			
+			// Restore frontmatter for all files
+			const restoredFolder = this.app.vault.getAbstractFileByPath(newPath) as TFolder;
+			if (restoredFolder) {
+				await this.markMOCFilesAsArchived(restoredFolder, false);
+			}
+			
+			new Notice(`Unarchived MOC: ${mocFile.basename}`);
+		} catch (error) {
+			this.handleError('Error unarchiving MOC', error);
+		}
+	}
+	
+	/**
+	 * Toggles the archive state of a MOC
+	 * @param file Any file within the MOC
+	 */
+	async toggleArchiveMOC(file?: TFile): Promise<void> {
+		const activeFile = file || this.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice('No active file');
+			return;
+		}
+		
+		// Determine if MOC is archived based on path
+		const isArchived = activeFile.path.includes('archived/');
+		
+		if (isArchived) {
+			await this.unarchiveMOC(activeFile);
+		} else {
+			await this.archiveMOC(activeFile);
+		}
+	}
+	
+	/**
+	 * Updates the note-type frontmatter for all files in a MOC folder
+	 * @param folder The MOC folder containing files to update
+	 * @param markAsArchived Whether to mark as archived or restore original
+	 */
+	private async markMOCFilesAsArchived(folder: TFolder, markAsArchived: boolean): Promise<void> {
+		const files = this.getAllFilesInFolder(folder);
+		
+		for (const file of files) {
+			if (file instanceof TFile && file.extension === 'md') {
+				await this.app.vault.process(file, (content) => {
+					const lines = content.split('\n');
+					
+					// Find frontmatter boundaries
+					if (lines[0] === '---') {
+						const closingIndex = lines.slice(1).findIndex(line => line === '---') + 1;
+						
+						if (closingIndex > 0) {
+							// Look for note-type field
+							let noteTypeIndex = -1;
+							for (let i = 1; i < closingIndex; i++) {
+								if (lines[i].startsWith('note-type:')) {
+									noteTypeIndex = i;
+									break;
+								}
+							}
+							
+							if (noteTypeIndex > -1) {
+								if (markAsArchived) {
+									// Prefix with archived- if not already
+									const currentType = lines[noteTypeIndex].split(':')[1].trim();
+									if (!currentType.startsWith('archived-')) {
+										lines[noteTypeIndex] = `note-type: archived-${currentType}`;
+									}
+								} else {
+									// Remove archived- prefix
+									lines[noteTypeIndex] = lines[noteTypeIndex].replace('archived-', '');
+								}
+							}
+						}
+					}
+					
+					return lines.join('\n');
+				});
+			}
+		}
+	}
+	
+	/**
+	 * Recursively gets all files in a folder and its subfolders
+	 * @param folder The folder to search
+	 * @returns Array of all files found
+	 */
+	private getAllFilesInFolder(folder: TFolder): TFile[] {
+		const files: TFile[] = [];
+		
+		for (const child of folder.children) {
+			if (child instanceof TFile) {
+				files.push(child);
+			} else if (child instanceof TFolder) {
+				files.push(...this.getAllFilesInFolder(child));
+			}
+		}
+		
+		return files;
 	}
 
 	// =================================================================================
