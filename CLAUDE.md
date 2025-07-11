@@ -4,12 +4,11 @@
 This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) system for note organization. The plugin is currently stable and fully functional.
 
 ## Current State
-- **Status**: Stable - All redesign phases complete, plugin built successfully
-- **Last update**: Fixed openLLMLinks function to handle concatenated URL strings in frontmatter
+- **Status**: Stable and fully functional
 - **Architecture**: Keyboard-first workflow with minimal modals
 - **Performance**: Optimized with metadata caching and efficient DOM updates
 - **Build status**: Successfully built with npm dependencies installed
-- **See**: PLUGIN_REDESIGN_PLAN.md for implementation history
+- **Archive feature**: MOCs can be archived/unarchived with Cmd+Shift+A
 
 ## File Inventory
 
@@ -21,7 +20,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 
 ### Documentation
 - `COMPREHENSIVE_TESTING_GUIDE.md` - Complete testing plan for all plugin features
-- `PLUGIN_REDESIGN_PLAN.md` - Historical record of redesign phases
+- `PLUGIN_REDESIGN_PLAN.md` - Implementation planning documentation
 
 ### Utilities
 - `src/utils/helpers.ts` - General utility functions (emoji, color, frontmatter)
@@ -158,18 +157,10 @@ Note: Nested structure groups iterations by prompt name
 - styles.css file in plugin directory for base styles
 - No other special requirements
 
-## Redesign Achievements
-- ✅ Phase 1: Merged note types and flattened folder structure
-- ✅ Phase 2: Reduced modals from 11 to 3 core commands with keyboard shortcuts
-- ✅ Phase 3: Eliminated prompt hub pattern for direct iteration system
-- ✅ Phase 4: Added default content, smart emoji detection, and performance optimizations
-
-All planned redesign phases have been successfully completed.
-
-## Recent Fixes & Features
-- **MOC Archiving**: Added archive/unarchive functionality (Cmd+Shift+A). Archives move entire MOC folders to an "archived" folder and prefix note-type with "archived-" to filter from graph view. Works from any file within a MOC.
-- **openLLMLinks Function**: Fixed to handle both array format and concatenated string format in frontmatter. Now properly parses individual URLs from concatenated strings like `https://url1.comhttps://url2.com` using regex pattern matching.
-- **Optional Resource Creation**: Added ability to skip creating default resource when creating MOCs. Both `createMOC()` and `createSubMOC()` now accept an optional `createResource` parameter (defaults to true for backwards compatibility). CreateMOCModal now includes a checkbox to control resource creation.
+## Current Features
+- **MOC Archiving**: Archive/unarchive functionality (Cmd+Shift+A). Moves entire MOC folders to "archived" folder and prefixes note-type with "archived-" for graph filtering. Works from any file within a MOC.
+- **LLM Links**: Handles both array format and concatenated string format in frontmatter. Parses individual URLs from concatenated strings like `https://url1.comhttps://url2.com` using regex pattern matching.
+- **Optional Resource Creation**: MOC creation can skip default resource. Both `createMOC()` and `createSubMOC()` accept optional `createResource` parameter (defaults to true). CreateMOCModal includes checkbox to control resource creation.
 
 ## Temporary Workarounds
 None currently in place.
