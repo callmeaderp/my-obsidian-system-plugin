@@ -9,6 +9,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - **Performance**: Optimized with metadata caching and efficient DOM updates
 - **Build status**: Successfully built with npm dependencies installed
 - **Archive feature**: MOCs can be archived/unarchived with Cmd+Shift+A
+- **MOC Emojis**: Random emojis for each MOC (not standardized)
 
 ## File Inventory
 
@@ -51,8 +52,8 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `findParentMOC()` - src/main.ts:588 - Finds parent MOC from file location
 
 ### MOC Creation
-- `createMOC()` - src/main.ts:431 - Creates root MOCs with optional default resource (createResource parameter defaults to true)
-- `createSubMOC()` - src/main.ts:478 - Creates sub-MOCs under parents with optional default resource (createResource parameter defaults to true)
+- `createMOC()` - src/main.ts:431 - Creates root MOCs with random emoji (uses getRandomEmoji())
+- `createSubMOC()` - src/main.ts:478 - Creates sub-MOCs with random emoji (uses getRandomEmoji())
 - `ensureMOCFolderStructure()` - src/main.ts:871 - Creates MOC folder only (no subfolders)
 
 ### File Creation
@@ -86,6 +87,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `updateMOCStyles()` - src/main.ts:245 - Generates dynamic CSS for MOC colors
 - `generateMOCColorStyles()` - src/main.ts:289 - Creates folder color rules
 - `generateRandomColor()` - src/utils/helpers.ts:28 - Generates HSL colors
+- `getRandomEmoji()` - src/utils/helpers.ts:13 - Generates random emojis from configured ranges
 
 ## Important Data Structures
 
@@ -100,17 +102,17 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `llm-links`: Array or concatenated string, URLs to LLM conversations (Phase 3)
 
 ### File Naming Patterns (Current)
-- MOCs: `🎯 [name] MOC.md` (standardized emoji)
+- MOCs: `[emoji] [name] MOC.md` (random emoji for each MOC)
 - Resources: `📚 [name].md` (merged notes + resources)
 - Prompts: `🤖 [name] v[N].md` (no hub files, direct iterations)
 
 ### Folder Structure (Current Default)
 ```
-🎯 [MOC Name] MOC/
-├── 🎯 [MOC Name] MOC.md
+[emoji] [MOC Name] MOC/
+├── [emoji] [MOC Name] MOC.md
 └── 📚 [MOC Name].md  (default resource, shares MOC name)
 ```
-Note: Flat structure, no subfolders, no default prompts
+Note: Flat structure, no subfolders, no default prompts, random emoji per MOC
 
 ### MOC Prompts Section Structure (Phase 3)
 ```markdown
@@ -142,7 +144,7 @@ Note: Nested structure groups iterations by prompt name
 - Uses Electron's shell API for opening URLs
 
 ### Key Design Decisions
-- Standardized emojis for consistency (🎯 MOCs, 📚 Resources, 🤖 Prompts)
+- Random emojis for MOC visual distinction (uses getRandomEmoji() from emoji ranges)
 - HSL color generation for theme compatibility
 - Frontmatter-based metadata for flexibility
 - Section ordering enforced for consistency
@@ -153,16 +155,28 @@ Note: Nested structure groups iterations by prompt name
 - Auto-creation of default resource with MOC name for immediate usability
 - Smart emoji detection for automatic file typing (Phase 4)
 
+### Emoji Configuration
+- `getRandomEmoji()` function in src/utils/helpers.ts generates random emojis
+- Uses Unicode ranges defined in CONFIG.EMOJI_RANGES:
+  - Emoticons (0x1F600-0x1F64F)
+  - Misc Symbols (0x1F300-0x1F5FF)
+  - Transport symbols (0x1F680-0x1F6FF)
+  - Supplemental symbols (0x1F900-0x1F9FF)
+- MOCs get unique random emoji on creation (not standardized 🎯)
+- Resources use 📚 emoji
+- Prompts use 🤖 emoji
+
 ## Environment Requirements
 - Obsidian 0.15.0 or higher
 - styles.css file in plugin directory for base styles
 - No other special requirements
 
 ## Current Features
+- **Random MOC Emojis**: Each MOC gets a unique random emoji for memorable visual identification
 - **MOC Archiving**: Archive/unarchive functionality (Cmd+Shift+A). Moves entire MOC folders to "archived" folder and prefixes note-type with "archived-" for graph filtering. Works from any file within a MOC.
 - **LLM Links**: Handles both array format and concatenated string format in frontmatter. Parses individual URLs from concatenated strings by detecting each http:// or https:// occurrence.
 - **Optional Resource Creation**: MOC creation can skip default resource. Both `createMOC()` and `createSubMOC()` accept optional `createResource` parameter (defaults to true). CreateMOCModal includes checkbox to control resource creation.
-- **Smart Version Numbering**: Prompt iterations now scan all existing versions for the prompt group and use the highest version + 1, preventing duplicate version numbers.
+- **Smart Version Numbering**: Prompt iterations scan all existing versions for the prompt group and use the highest version + 1, preventing duplicate version numbers.
 
 ## Temporary Workarounds
 None currently in place.

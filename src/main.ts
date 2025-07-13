@@ -441,7 +441,7 @@ ${selector} .nav-folder-collapse-indicator {
 			const mocName = ensureMOCSuffix(sanitizedName);
 			
 			// Generate visual identifier and color
-			const emoji = CONFIG.NOTE_TYPES.MOCs.emoji;
+			const emoji = getRandomEmoji();
 			const colorInfo = generateRandomColor();
 			const folderName = `${emoji} ${mocName}`;
 			
@@ -486,7 +486,7 @@ ${selector} .nav-folder-collapse-indicator {
 			const sanitizedName = sanitizeInput(name, 'Sub-MOC name');
 			const mocName = ensureMOCSuffix(sanitizedName);
 			
-			const emoji = CONFIG.NOTE_TYPES.MOCs.emoji;
+			const emoji = getRandomEmoji();
 			const colorInfo = generateRandomColor();
 			const parentPath = parentMOC.parent?.path || '';
 			const folderName = `${parentPath}/${emoji} ${mocName}`;
