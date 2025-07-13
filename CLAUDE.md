@@ -47,7 +47,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `quickCreateMOC()` - src/main.ts:520 - Quick MOC creation with default content (Cmd+Shift+M)
 - `quickAdd()` - src/main.ts:543 - Context-aware content addition (Cmd+M)
 - `quickIterate()` - src/main.ts:612 - Quick prompt iteration with frontmatter sync (Cmd+I)
-- `toggleArchiveMOC()` - src/main.ts:2304 - Archive/unarchive MOC (Cmd+Shift+A)
+- `toggleArchiveMOC()` - src/main.ts:2336 - Archive/unarchive MOC (Cmd+Shift+A)
 - `findParentMOC()` - src/main.ts:588 - Finds parent MOC from file location
 
 ### MOC Creation
@@ -63,23 +63,24 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 ### MOC Management
 - `addToMOCSection()` - src/main.ts:1014 - Adds links to MOC sections
 - `reorganizeContentForPluginSections()` - src/main.ts:1085 - Maintains section order
-- `moveRootMOCToSub()` - src/main.ts:1478 - Converts root to sub-MOC
-- `promoteSubMOCToRoot()` - src/main.ts:1504 - Converts sub-MOC to root
-- `archiveMOC()` - src/main.ts:2214 - Archives MOC to archived folder
-- `unarchiveMOC()` - src/main.ts:2259 - Restores MOC from archive
-- `markMOCFilesAsArchived()` - src/main.ts:2326 - Updates frontmatter for archive state
+- `moveRootMOCToSub()` - src/main.ts:1510 - Converts root to sub-MOC
+- `promoteSubMOCToRoot()` - src/main.ts:1536 - Converts sub-MOC to root
+- `archiveMOC()` - src/main.ts:2246 - Archives MOC to archived folder
+- `unarchiveMOC()` - src/main.ts:2291 - Restores MOC from archive
+- `markMOCFilesAsArchived()` - src/main.ts:2358 - Updates frontmatter for archive state
 
 ### Prompt Features
-- `duplicatePromptIteration()` - src/main.ts:1295 - Creates new prompt versions (Phase 3 - no hub files)
-- `openLLMLinks()` - src/main.ts:1389 - Opens URLs from iteration frontmatter (now handles both array and concatenated string formats)
+- `duplicatePromptIteration()` - src/main.ts:1301 - Creates new prompt versions (Phase 3 - no hub files)
+- `openLLMLinks()` - src/main.ts:1425 - Opens URLs from iteration frontmatter (handles both array and concatenated string formats)
 - `extractPromptVersion()` - src/utils/validation.ts:155 - Parses version numbers
 - `addPromptToMOC()` - src/main.ts:1162 - Adds prompts with nested iteration structure
+- `findNextAvailableVersion()` - src/main.ts:1385 - Finds highest version + 1 for prompt group
 
 ### Vault Maintenance
-- `updateVaultToLatestSystem()` - src/main.ts:1568 - Updates all plugin files
-- `cleanupMOCSystem()` - src/main.ts:2005 - Removes all plugin files
-- `undoTestChanges()` - src/main.ts:2036 - Removes files created in session
-- `cleanupBrokenLinks()` - src/main.ts:2070 - Removes links to deleted files
+- `updateVaultToLatestSystem()` - src/main.ts:1600 - Updates all plugin files
+- `cleanupMOCSystem()` - src/main.ts:2037 - Removes all plugin files
+- `undoTestChanges()` - src/main.ts:2068 - Removes files created in session
+- `cleanupBrokenLinks()` - src/main.ts:2102 - Removes links to deleted files
 
 ### Styling
 - `updateMOCStyles()` - src/main.ts:245 - Generates dynamic CSS for MOC colors
@@ -96,7 +97,7 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `root-moc-color`: Boolean flag for root MOCs
 - `prompt-group`: String, groups related prompt iterations (Phase 3)
 - `iteration`: Number, prompt version number (Phase 3)
-- `llm-links`: Array, URLs to LLM conversations (Phase 3)
+- `llm-links`: Array or concatenated string, URLs to LLM conversations (Phase 3)
 
 ### File Naming Patterns (Current)
 - MOCs: `🎯 [name] MOC.md` (standardized emoji)
@@ -159,8 +160,9 @@ Note: Nested structure groups iterations by prompt name
 
 ## Current Features
 - **MOC Archiving**: Archive/unarchive functionality (Cmd+Shift+A). Moves entire MOC folders to "archived" folder and prefixes note-type with "archived-" for graph filtering. Works from any file within a MOC.
-- **LLM Links**: Handles both array format and concatenated string format in frontmatter. Parses individual URLs from concatenated strings like `https://url1.comhttps://url2.com` using regex pattern matching.
+- **LLM Links**: Handles both array format and concatenated string format in frontmatter. Parses individual URLs from concatenated strings by detecting each http:// or https:// occurrence.
 - **Optional Resource Creation**: MOC creation can skip default resource. Both `createMOC()` and `createSubMOC()` accept optional `createResource` parameter (defaults to true). CreateMOCModal includes checkbox to control resource creation.
+- **Smart Version Numbering**: Prompt iterations now scan all existing versions for the prompt group and use the highest version + 1, preventing duplicate version numbers.
 
 ## Temporary Workarounds
 None currently in place.

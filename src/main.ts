@@ -1327,7 +1327,8 @@ ${selector} .nav-folder-collapse-indicator {
 
 			new PromptDescriptionModal(this.app, async (description: string) => {
 				try {
-					const nextVersion = currentVersion + 1;
+					// Find the highest existing version number for this prompt group
+					const nextVersion = await this.findNextAvailableVersion(promptGroup, mocFolder);
 					
 					// Build new iteration filename with optional description
 					let newIterationName = `${CONFIG.NOTE_TYPES.Prompts.emoji} ${promptGroup} v${nextVersion}`;
@@ -1379,6 +1380,35 @@ ${selector} .nav-folder-collapse-indicator {
 	}
 
 	/**
+	 * Find the next available version number for a prompt group
+	 */
+	private async findNextAvailableVersion(promptGroup: string, mocFolder: TFolder): Promise<number> {
+		let highestVersion = 0;
+		
+		// Scan all files in the MOC folder
+		for (const child of mocFolder.children) {
+			if (child instanceof TFile && child.extension === 'md') {
+				// Check if this is a prompt file for the same group
+				const metadata = this.app.metadataCache.getFileCache(child);
+				const frontmatter = metadata?.frontmatter;
+				
+				if (frontmatter && 
+					frontmatter['note-type'] === 'prompt' && 
+					frontmatter['prompt-group'] === promptGroup) {
+					// Extract version from basename
+					const version = extractPromptVersion(child.basename);
+					if (version && version > highestVersion) {
+						highestVersion = version;
+					}
+				}
+			}
+		}
+		
+		// Return the next available version
+		return highestVersion + 1;
+	}
+
+	/**
 	 * Strips frontmatter from content
 	 */
 	private stripFrontmatter(content: string): string {
@@ -1411,11 +1441,39 @@ ${selector} .nav-folder-collapse-indicator {
 				llmLinks = llmLinksField;
 			} else if (typeof llmLinksField === 'string') {
 				// Parse concatenated URLs from string
-				// Split by http:// or https:// patterns
-				const urlPattern = /(https?:\/\/[^\s]+)/g;
-				const matches = llmLinksField.match(urlPattern);
-				if (matches) {
-					llmLinks = matches;
+				// Split string at each occurrence of http:// or https://
+				// This handles cases where URLs are concatenated without separators
+				const urlStarts = [];
+				let searchIndex = 0;
+				
+				// Find all positions where URLs start
+				while (true) {
+					const httpIndex = llmLinksField.indexOf('http://', searchIndex);
+					const httpsIndex = llmLinksField.indexOf('https://', searchIndex);
+					
+					let nextIndex = -1;
+					if (httpIndex !== -1 && httpsIndex !== -1) {
+						nextIndex = Math.min(httpIndex, httpsIndex);
+					} else if (httpIndex !== -1) {
+						nextIndex = httpIndex;
+					} else if (httpsIndex !== -1) {
+						nextIndex = httpsIndex;
+					} else {
+						break;
+					}
+					
+					urlStarts.push(nextIndex);
+					searchIndex = nextIndex + 1;
+				}
+				
+				// Extract URLs based on the start positions
+				for (let i = 0; i < urlStarts.length; i++) {
+					const start = urlStarts[i];
+					const end = i < urlStarts.length - 1 ? urlStarts[i + 1] : llmLinksField.length;
+					const url = llmLinksField.substring(start, end).trim();
+					if (url) {
+						llmLinks.push(url);
+					}
 				}
 			}
 			
