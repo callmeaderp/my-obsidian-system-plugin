@@ -1,4 +1,4 @@
-import { App, Plugin, TFile, TFolder, normalizePath, Notice, Modifier } from 'obsidian';
+import { App, Plugin, TFile, TFolder, normalizePath, Notice, Modifier, MarkdownView } from 'obsidian';
 
 // Plugin modules
 import { PluginSettings, SectionType, NoteType, CreateConfig, ColorInfo, UpdateResult, VaultUpdatePlan } from './types';
@@ -39,6 +39,9 @@ export default class MOCSystemPlugin extends Plugin {
 	
 	// Debounced style update to prevent excessive DOM manipulation
 	private debouncedStyleUpdate = debounce(() => this.updateMOCStyles(), CONFIG.STYLE_DELAYS.UPDATE);
+	
+	// Tab observer to detect new tabs being added to the DOM
+	private tabObserver: MutationObserver | null = null;
 
 	/**
 	 * Plugin initialization sequence
@@ -66,6 +69,11 @@ export default class MOCSystemPlugin extends Plugin {
 	 */
 	onunload() {
 		this.removeStyles();
+		// Clean up mutation observer
+		if (this.tabObserver) {
+			this.tabObserver.disconnect();
+			this.tabObserver = null;
+		}
 		console.log('MOC System Plugin unloaded');
 	}
 
@@ -78,12 +86,21 @@ export default class MOCSystemPlugin extends Plugin {
 	 */
 	private initializeStyles() {
 		// Initial application after basic plugin load
-		setTimeout(() => this.updateMOCStyles(), CONFIG.STYLE_DELAYS.INITIAL);
+		setTimeout(() => {
+			this.updateMOCStyles();
+			this.updateTabAttributes();
+		}, CONFIG.STYLE_DELAYS.INITIAL);
 		
 		// Re-apply after workspace layout is fully ready
-		this.app.workspace.onLayoutReady(() => 
-			setTimeout(() => this.updateMOCStyles(), CONFIG.STYLE_DELAYS.LAYOUT_READY)
-		);
+		this.app.workspace.onLayoutReady(() => {
+			setTimeout(() => {
+				this.updateMOCStyles();
+				this.updateTabAttributes();
+			}, CONFIG.STYLE_DELAYS.LAYOUT_READY);
+			
+			// Set up tab observer for dynamic updates
+			this.setupTabObserver();
+		});
 	}
 
 	/**
@@ -223,6 +240,22 @@ export default class MOCSystemPlugin extends Plugin {
 				}
 			})
 		);
+		
+		// Update tab attributes when active leaf changes
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', () => {
+				// Update tab attributes when switching tabs
+				this.updateTabAttributes();
+			})
+		);
+		
+		// Update tab attributes when layout changes (tabs opened/closed)
+		this.registerEvent(
+			this.app.workspace.on('layout-change', () => {
+				// Update tab attributes when tabs are opened/closed
+				setTimeout(() => this.updateTabAttributes(), 100);
+			})
+		);
 
 		// Smart emoji detection for automatic file type determination
 		this.registerEvent(
@@ -312,6 +345,7 @@ export default class MOCSystemPlugin extends Plugin {
 		}
 
 		const colorStyles: string[] = [];
+		const tabStyles: string[] = [];
 		
 		// Batch process all MOCs
 		const processPromises = allMOCs.map(async (moc) => {
@@ -332,10 +366,20 @@ export default class MOCSystemPlugin extends Plugin {
 				if (metadata.lightColor && metadata.darkColor && moc.parent) {
 					const escapedPath = this.escapeForCSS(moc.parent.path);
 					console.log(`Generating styles for MOC: ${moc.parent.path} -> ${escapedPath}`);
-					return [
+					
+					// Generate folder styles
+					const folderStyles = [
 						this.generateThemeCSS(escapedPath, metadata.lightColor, 'light'),
 						this.generateThemeCSS(escapedPath, metadata.darkColor, 'dark')
 					];
+					
+					// Generate tab styles for all files in this MOC
+					const tabCss = await this.generateTabStylesForMOC(moc.parent, metadata.lightColor, metadata.darkColor);
+					
+					return {
+						folderStyles,
+						tabStyles: tabCss
+					};
 				}
 			} catch (error) {
 				console.warn(`Failed to generate styles for MOC: ${moc.path}`, error);
@@ -349,11 +393,15 @@ export default class MOCSystemPlugin extends Plugin {
 		// Flatten results and filter out nulls
 		results.forEach(result => {
 			if (result) {
-				colorStyles.push(...result);
+				colorStyles.push(...result.folderStyles);
+				if (result.tabStyles) {
+					tabStyles.push(result.tabStyles);
+				}
 			}
 		});
 		
-		return colorStyles.join('\n');
+		// Combine folder and tab styles
+		return `${colorStyles.join('\n')}\n\n/* ===== TAB COLORS ===== */\n${tabStyles.join('\n')}`;
 	}
 
 	/**
@@ -380,6 +428,47 @@ ${selector}:hover {
 }
 ${selector} .nav-folder-collapse-indicator { 
     color: ${color} !important; 
+}`;
+	}
+
+	/**
+	 * Generates CSS rules for tab coloring for all files in a MOC folder
+	 */
+	private async generateTabStylesForMOC(mocFolder: TFolder, lightColor: string, darkColor: string): Promise<string> {
+		const escapedPath = this.escapeForCSS(mocFolder.path);
+		console.log(`Generating tab styles for MOC folder: ${mocFolder.path}`);
+		
+		// Generate CSS using our custom data-moc-path attribute
+		return `
+/* Tab colors for MOC: ${mocFolder.path} */
+/* Light theme */
+.workspace-tab-header[data-moc-path="${escapedPath}"] .workspace-tab-header-inner {
+    background-color: ${adjustColorOpacity(lightColor, 0.15)} !important;
+}
+.workspace-tab-header[data-moc-path="${escapedPath}"].is-active .workspace-tab-header-inner {
+    background-color: ${adjustColorOpacity(lightColor, 0.3)} !important;
+}
+.is-focused .workspace-tab-header[data-moc-path="${escapedPath}"].is-active .workspace-tab-header-inner {
+    background-color: ${adjustColorOpacity(lightColor, 0.4)} !important;
+}
+
+/* Dark theme */
+.theme-dark .workspace-tab-header[data-moc-path="${escapedPath}"] .workspace-tab-header-inner {
+    background-color: ${adjustColorOpacity(darkColor, 0.15)} !important;
+}
+.theme-dark .workspace-tab-header[data-moc-path="${escapedPath}"].is-active .workspace-tab-header-inner {
+    background-color: ${adjustColorOpacity(darkColor, 0.3)} !important;
+}
+.theme-dark.is-focused .workspace-tab-header[data-moc-path="${escapedPath}"].is-active .workspace-tab-header-inner {
+    background-color: ${adjustColorOpacity(darkColor, 0.4)} !important;
+}
+
+/* Also color the border for better visibility */
+.workspace-tab-header[data-moc-path="${escapedPath}"] {
+    border-bottom: 2px solid ${lightColor} !important;
+}
+.theme-dark .workspace-tab-header[data-moc-path="${escapedPath}"] {
+    border-bottom: 2px solid ${darkColor} !important;
 }`;
 	}
 
@@ -2076,6 +2165,104 @@ ${selector} .nav-folder-collapse-indicator {
 		
 		// Default fallback
 		return 'resource';
+	}
+	
+	/**
+	 * Updates tab DOM elements with MOC path attributes for styling
+	 */
+	private async updateTabAttributes() {
+		// Get all tab headers in the workspace
+		const tabHeaders = document.querySelectorAll('.workspace-tab-header');
+		
+		// Get all open markdown files and create a mapping
+		const leaves = this.app.workspace.getLeavesOfType('markdown');
+		const openFiles = new Map<string, TFile>();
+		
+		// Build a map of file basenames to TFile objects
+		for (const leaf of leaves) {
+			const view = leaf.view as any;
+			const file = view?.file || view?.getFile?.();
+			if (file instanceof TFile) {
+				openFiles.set(file.basename, file);
+			}
+		}
+		
+		// Process each tab header
+		tabHeaders.forEach((tab: HTMLElement) => {
+			// Find the title element within the tab
+			const titleEl = tab.querySelector('.workspace-tab-header-inner-title');
+			if (!titleEl) return;
+			
+			const tabTitle = titleEl.textContent || '';
+			const file = openFiles.get(tabTitle);
+			
+			if (!file) {
+				// No file found for this tab - remove any MOC styling
+				tab.removeAttribute('data-moc-path');
+				tab.classList.remove('moc-colored-tab');
+				return;
+			}
+			
+			// Find the MOC this file belongs to
+			const parentMOC = this.findParentMOC(file);
+			
+			if (!parentMOC || !parentMOC.parent) {
+				// File is not in a MOC - remove any MOC styling
+				tab.removeAttribute('data-moc-path');
+				tab.classList.remove('moc-colored-tab');
+				return;
+			}
+			
+			// File is in a MOC - set or update the attribute
+			const mocPath = parentMOC.parent.path;
+			tab.setAttribute('data-moc-path', mocPath);
+			tab.classList.add('moc-colored-tab');
+		});
+	}
+	
+	/**
+	 * Sets up a MutationObserver to watch for new tabs being added
+	 */
+	private setupTabObserver() {
+		// Find the workspace tabs container
+		const tabContainer = document.querySelector('.workspace-tabs');
+		if (!tabContainer) {
+			console.warn('MOC System: Tab container not found, retrying...');
+			setTimeout(() => this.setupTabObserver(), 1000);
+			return;
+		}
+		
+		// Create observer to watch for new tabs
+		this.tabObserver = new MutationObserver((mutations) => {
+			let shouldUpdate = false;
+			
+			// Check if any new tab headers were added
+			mutations.forEach(mutation => {
+				mutation.addedNodes.forEach(node => {
+					if (node instanceof HTMLElement && 
+						(node.classList.contains('workspace-tab-header') || 
+						 node.querySelector('.workspace-tab-header'))) {
+						shouldUpdate = true;
+					}
+				});
+			});
+			
+			// Update attributes if needed
+			if (shouldUpdate) {
+				// Small delay to ensure DOM is settled
+				setTimeout(() => {
+					this.updateTabAttributes();
+				}, 50);
+			}
+		});
+		
+		// Start observing the workspace for changes
+		this.tabObserver.observe(tabContainer, {
+			childList: true,
+			subtree: true
+		});
+		
+		console.log('MOC System: Tab observer initialized');
 	}
 
 	/**
