@@ -144,6 +144,11 @@ export default class MOCSystemPlugin extends Plugin {
 				id: 'undo-test-changes', 
 				name: 'Undo test changes (since session start)', 
 				callback: () => this.undoTestChanges() 
+			},
+			{
+				id: 'debug-moc-styling',
+				name: 'Debug MOC Styling',
+				callback: () => this.debugMOCStyling()
 			}
 		];
 
@@ -295,6 +300,8 @@ export default class MOCSystemPlugin extends Plugin {
 	private async generateMOCColorStyles(): Promise<string> {
 		// Performance optimization: Only refresh cache if MOCs have changed
 		const allMOCs = await this.getAllMOCs();
+		console.log('Generating styles for', allMOCs.length, 'MOCs');
+		
 		const currentTime = Date.now();
 		const needsCacheRefresh = currentTime - this.lastMOCUpdate > 5000; // Refresh every 5 seconds
 		
@@ -324,6 +331,7 @@ export default class MOCSystemPlugin extends Plugin {
 				
 				if (metadata.lightColor && metadata.darkColor && moc.parent) {
 					const escapedPath = this.escapeForCSS(moc.parent.path);
+					console.log(`Generating styles for MOC: ${moc.parent.path} -> ${escapedPath}`);
 					return [
 						this.generateThemeCSS(escapedPath, metadata.lightColor, 'light'),
 						this.generateThemeCSS(escapedPath, metadata.darkColor, 'dark')
@@ -377,9 +385,13 @@ ${selector} .nav-folder-collapse-indicator {
 
 	/**
 	 * Escapes special characters for CSS selectors
+	 * Properly handles spaces and other special characters
 	 */
 	private escapeForCSS(path: string): string {
-		return path.replace(/['"\\]/g, '\\$&');
+		// Escape special CSS characters including spaces
+		return path
+			.replace(/['"\\\/\[\](){}]/g, '\\$&')  // Escape special chars
+			.replace(/\s/g, '\\ ');  // Escape spaces with backslash
 	}
 
 	/**
@@ -2064,6 +2076,56 @@ ${selector} .nav-folder-collapse-indicator {
 		
 		// Default fallback
 		return 'resource';
+	}
+
+	/**
+	 * Debug function to check MOC styling issues
+	 */
+	private async debugMOCStyling() {
+		console.log('=== MOC STYLING DEBUG ===');
+		
+		// Check if style element exists
+		const styleElement = document.getElementById('moc-system-plugin-styles');
+		console.log('Style element exists:', !!styleElement);
+		
+		// Check folder elements
+		const folderElements = document.querySelectorAll('.nav-folder-title');
+		console.log(`Found ${folderElements.length} folder elements`);
+		
+		// Log folders with MOC in the name
+		let mocFolderCount = 0;
+		folderElements.forEach((el, index) => {
+			const path = el.getAttribute('data-path');
+			if (path && path.includes(' MOC')) {
+				console.log(`MOC Folder: data-path="${path}"`);
+				mocFolderCount++;
+				
+				// Check computed styles
+				const computed = window.getComputedStyle(el as HTMLElement);
+				console.log(`  Background: ${computed.background}`);
+				console.log(`  Border-left: ${computed.borderLeft}`);
+			}
+		});
+		console.log(`Total MOC folders found: ${mocFolderCount}`);
+		
+		// Check MOC files
+		const allMOCs = await this.getAllMOCs();
+		console.log(`\nFound ${allMOCs.length} MOC files:`);
+		for (const moc of allMOCs.slice(0, 3)) {
+			const cache = this.app.metadataCache.getFileCache(moc);
+			const frontmatter = cache?.frontmatter;
+			console.log(`- ${moc.path}`, {
+				parent: moc.parent?.path,
+				lightColor: frontmatter?.['light-color'],
+				darkColor: frontmatter?.['dark-color']
+			});
+		}
+		
+		// Force style update
+		console.log('\nForcing style update...');
+		await this.updateMOCStyles();
+		
+		new Notice('Check console for debug info');
 	}
 
 	async cleanupMOCSystem() {
