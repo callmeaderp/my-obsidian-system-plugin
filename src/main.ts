@@ -100,6 +100,12 @@ export default class MOCSystemPlugin extends Plugin {
 			
 			// Set up tab observer for dynamic updates
 			this.setupTabObserver();
+			
+			// Visit all tabs after a delay to trigger CSS styling
+			// This ensures tabs that were open on startup get their colors
+			setTimeout(() => {
+				this.visitAllTabs();
+			}, 1000); // 1 second delay to ensure everything is ready
 		});
 	}
 
@@ -2264,6 +2270,41 @@ ${selector} .nav-folder-collapse-indicator {
 		
 		console.log('MOC System: Tab observer initialized');
 	}
+	
+	/**
+	 * Visits all open tabs to trigger CSS styling
+	 * This is a workaround for tabs not being styled until clicked
+	 */
+	private async visitAllTabs() {
+		console.log('MOC System: Visiting all tabs to trigger styling...');
+		
+		// Get the currently active leaf to return to
+		const originalLeaf = this.app.workspace.getActiveViewOfType(MarkdownView)?.leaf || this.app.workspace.activeLeaf;
+		
+		// Get all markdown leaves
+		const leaves = this.app.workspace.getLeavesOfType('markdown');
+		console.log(`MOC System: Found ${leaves.length} markdown tabs to visit`);
+		
+		// Visit each leaf
+		for (let i = 0; i < leaves.length; i++) {
+			const leaf = leaves[i];
+			
+			// Set this leaf as active (simulates clicking the tab)
+			this.app.workspace.setActiveLeaf(leaf, { focus: false });
+			
+			// Small delay every few tabs to prevent UI freeze
+			if (i > 0 && i % 5 === 0) {
+				await new Promise(resolve => setTimeout(resolve, 1));
+			}
+		}
+		
+		// Return to the original leaf
+		if (originalLeaf) {
+			this.app.workspace.setActiveLeaf(originalLeaf, { focus: false });
+		}
+		
+		console.log('MOC System: Tab visit complete');
+	}
 
 	/**
 	 * Debug function to check MOC styling issues
@@ -2311,6 +2352,11 @@ ${selector} .nav-folder-collapse-indicator {
 		// Force style update
 		console.log('\nForcing style update...');
 		await this.updateMOCStyles();
+		
+		// Test tab visiting
+		console.log('\nTesting tab visit approach...');
+		await this.updateTabAttributes();
+		await this.visitAllTabs();
 		
 		new Notice('Check console for debug info');
 	}
