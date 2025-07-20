@@ -4,12 +4,14 @@
 This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) system for note organization. The plugin is currently stable and fully functional.
 
 ## Current State
-- **Status**: Stable and fully functional
+- **Status**: Stable and fully functional with both folder and tab coloring
 - **Architecture**: Keyboard-first workflow with minimal modals
 - **Performance**: Optimized with metadata caching and efficient DOM updates
 - **Build status**: Successfully built with npm dependencies installed
 - **Archive feature**: MOCs can be archived/unarchived with Cmd+Shift+A
 - **MOC Emojis**: Random emojis for each MOC (not standardized)
+- **Tab Coloring**: Tabs show background colors matching their MOC folders
+- **Styling System**: CSS escaping properly handles spaces in folder paths
 
 ## File Inventory
 
@@ -20,8 +22,8 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 - `src/errors.ts` - Custom error classes for specific error handling
 
 ### Documentation
-- `COMPREHENSIVE_TESTING_GUIDE.md` - Complete testing plan for all plugin features
-- `PLUGIN_REDESIGN_PLAN.md` - Implementation planning documentation
+- `docs/COMPREHENSIVE_TESTING_GUIDE.md` - Complete testing plan for all plugin features
+- `docs/PLUGIN_REDESIGN_PLAN.md` - Implementation planning documentation
 
 ### Utilities
 - `src/utils/helpers.ts` - General utility functions (emoji, color, frontmatter)
@@ -85,7 +87,12 @@ This is an Obsidian plugin that implements a hierarchical Map of Contents (MOC) 
 
 ### Styling
 - `updateMOCStyles()` - src/main.ts:245 - Generates dynamic CSS for MOC colors
-- `generateMOCColorStyles()` - src/main.ts:289 - Creates folder color rules
+- `generateMOCColorStyles()` - src/main.ts:300 - Creates folder and tab color rules
+- `generateTabStylesForMOC()` - src/main.ts:404 - Generates CSS for tab coloring
+- `updateTabAttributes()` - src/main.ts:2148 - Sets data-moc-path attributes on tabs
+- `visitAllTabs()` - src/main.ts:2272 - Cycles through tabs to trigger CSS styling
+- `setupTabObserver()` - src/main.ts:2210 - Watches for new tabs being added
+- `escapeForCSS()` - src/main.ts:446 - Properly escapes CSS selectors including spaces
 - `generateRandomColor()` - src/utils/helpers.ts:28 - Generates HSL colors
 - `getRandomEmoji()` - src/utils/helpers.ts:13 - Generates random emojis from configured ranges
 
@@ -177,6 +184,8 @@ Note: Nested structure groups iterations by prompt name
 - **LLM Links**: Handles both array format and concatenated string format in frontmatter. Parses individual URLs from concatenated strings by detecting each http:// or https:// occurrence.
 - **Optional Resource Creation**: MOC creation can skip default resource. Both `createMOC()` and `createSubMOC()` accept optional `createResource` parameter (defaults to true). CreateMOCModal includes checkbox to control resource creation.
 - **Smart Version Numbering**: Prompt iterations scan all existing versions for the prompt group and use the highest version + 1, preventing duplicate version numbers.
+- **Tab Coloring**: Workspace tabs display background colors matching their MOC folder colors. Uses data-moc-path attributes and CSS targeting. Includes automatic tab visiting on startup to ensure styling applies to all open tabs.
+- **Enhanced CSS Escaping**: Properly handles spaces and special characters in folder paths for reliable CSS selector generation.
 
 ## Temporary Workarounds
 None currently in place.
