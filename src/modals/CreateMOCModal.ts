@@ -37,7 +37,7 @@ export class CreateMOCModal extends BaseModal {
 
 		const createResourceCheckbox = resourceCheckboxContainer.createEl('input', { type: 'checkbox' });
 		createResourceCheckbox.id = 'create-resource-checkbox';
-		createResourceCheckbox.checked = true; // Default to creating resource for backwards compatibility
+		createResourceCheckbox.checked = false; // Default to not creating resource
 		createResourceCheckbox.style.marginRight = '8px';
 		
 		const resourceCheckboxLabel = resourceCheckboxContainer.createEl('label', { text: 'Create default resource' });
@@ -54,6 +54,7 @@ export class CreateMOCModal extends BaseModal {
 
 		const createPromptCheckbox = checkboxContainer.createEl('input', { type: 'checkbox' });
 		createPromptCheckbox.id = 'create-prompt-checkbox';
+		createPromptCheckbox.checked = true; // Default to creating prompt
 		createPromptCheckbox.style.marginRight = '8px';
 		
 		const checkboxLabel = checkboxContainer.createEl('label', { text: 'Also create a prompt' });
@@ -66,7 +67,7 @@ export class CreateMOCModal extends BaseModal {
 			placeholder: 'Prompt name...' 
 		});
 		promptNameEl.style.width = '100%';
-		promptNameEl.style.display = 'none';
+		promptNameEl.style.display = 'block'; // Show by default since prompt checkbox is checked
 
 		/**
 		 * Toggles prompt name input visibility and focuses it when shown

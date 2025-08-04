@@ -182,7 +182,8 @@ Note: Nested structure groups iterations by prompt name
 - **Random MOC Emojis**: Each MOC gets a unique random emoji for memorable visual identification
 - **MOC Archiving**: Archive/unarchive functionality (Cmd+Shift+A). Moves entire MOC folders to "archived" folder and prefixes note-type with "archived-" for graph filtering. Works from any file within a MOC.
 - **LLM Links**: Handles both array format and concatenated string format in frontmatter. Parses individual URLs from concatenated strings by detecting each http:// or https:// occurrence.
-- **Optional Resource Creation**: MOC creation can skip default resource. Both `createMOC()` and `createSubMOC()` accept optional `createResource` parameter (defaults to true). CreateMOCModal includes checkbox to control resource creation.
+- **Optional Resource Creation**: MOC creation can skip default resource. Both `createMOC()` and `createSubMOC()` accept optional `createResource` parameter (defaults to true). CreateMOCModal includes checkbox to control resource creation (unchecked by default).
+- **Default Prompt Creation**: CreateMOCModal now defaults to creating a prompt alongside the MOC (checkbox checked by default). This aligns with typical workflow where prompts are more commonly needed than resources.
 - **Smart Version Numbering**: Prompt iterations scan all existing versions for the prompt group and use the highest version + 1, preventing duplicate version numbers.
 - **Tab Coloring**: Workspace tabs display background colors matching their MOC folder colors. Uses data-moc-path attributes and CSS targeting. Includes automatic tab visiting on startup to ensure styling applies to all open tabs.
 - **Enhanced CSS Escaping**: Properly handles spaces and special characters in folder paths for reliable CSS selector generation.
